@@ -856,16 +856,38 @@
     }
 
     /**
-     * Recalcula el total de una línea y refresca su casilla en pantalla.
+     * Total de una línea calculado desde cantidad, precio y descuento.
      */
-    function recalcularLinea_(rowObj, inputsPorColumna) {
-      if (!Object.prototype.hasOwnProperty.call(rowObj, COLUMNA_TOTAL_LINEA)) return;
-
+    function calcularTotalLinea_(rowObj) {
       const cantidad = aNumero_(rowObj['Cantidad']);
       const precio = aNumero_(rowObj['Precio €']);
       const descuento = aNumero_(rowObj['%']);
-      const total = redondear2_(cantidad * precio * (1 - descuento / 100));
+      return redondear2_(cantidad * precio * (1 - descuento / 100));
+    }
 
+    /**
+     * Total que hay que contar para una línea al sumar el presupuesto.
+     *
+     * Si la línea trae un total propio se respeta; si no lo trae o viene
+     * vacío, se calcula. Hay presupuestos guardados cuyas líneas solo
+     * tienen cantidad, precio y descuento (extracciones antiguas que no
+     * rellenaron el total): sin este respaldo sumarían cero y dejarían el
+     * Subtotal y el Total del documento a cero.
+     */
+    function totalEfectivoLinea_(rowObj) {
+      if (!rowObj) return 0;
+      const propio = rowObj[COLUMNA_TOTAL_LINEA];
+      if (propio === null || propio === undefined || propio === '') {
+        return calcularTotalLinea_(rowObj);
+      }
+      return aNumero_(propio);
+    }
+
+    /**
+     * Recalcula el total de una línea y refresca su casilla en pantalla.
+     */
+    function recalcularLinea_(rowObj, inputsPorColumna) {
+      const total = calcularTotalLinea_(rowObj);
       rowObj[COLUMNA_TOTAL_LINEA] = total;
 
       const input = inputsPorColumna[COLUMNA_TOTAL_LINEA];
@@ -880,7 +902,7 @@
       if (!currentBudget || !Array.isArray(currentBudget[TABLA_LINEAS])) return;
 
       const subtotal = redondear2_(currentBudget[TABLA_LINEAS].reduce(function (acc, linea) {
-        return acc + aNumero_(linea && linea[COLUMNA_TOTAL_LINEA]);
+        return acc + totalEfectivoLinea_(linea);
       }, 0));
 
       if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_SUBTOTAL)) {
