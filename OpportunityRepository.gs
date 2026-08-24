@@ -207,15 +207,42 @@ function generarSiguienteOp_() {
 /**
  * Abre (o crea, con su fila de cabecera) la hoja "Oportunidades" dentro
  * del spreadsheet configurado en Config.gs.
+ *
+ * La busqueda del nombre es tolerante a proposito. getSheetByName()
+ * distingue mayusculas y espacios, asi que una pestaña llamada
+ * "oportunidades" o "Oportunidades " no la encontraba: se creaba una
+ * SEGUNDA pestaña vacia con el nombre exacto y la aplicacion leia de esa,
+ * mientras los datos seguian en la original. El resultado era un listado
+ * vacio sobre una hoja que si tenia oportunidades guardadas.
+ *
+ * Ahora, si no hay coincidencia exacta, se busca ignorando mayusculas y
+ * espacios sobrantes y se reutiliza esa pestaña tal cual. No se renombra
+ * (es la hoja del usuario) y solo se crea una nueva cuando de verdad no
+ * existe ninguna.
  */
 function getSheet_() {
   const ss = SpreadsheetApp.openById(getSpreadsheetId_());
-  let sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.SHEET_NAME);
-    sheet.appendRow(SHEET_COLUMNS_);
+
+  const exacta = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (exacta) return exacta;
+
+  const buscado = String(CONFIG.SHEET_NAME).trim().toLowerCase();
+  const equivalente = ss.getSheets().filter(function (s) {
+    return String(s.getName()).trim().toLowerCase() === buscado;
+  })[0];
+
+  if (equivalente) {
+    debugLog_('Pestaña localizada por nombre equivalente', {
+      buscado: CONFIG.SHEET_NAME,
+      encontrado: equivalente.getName()
+    });
+    return equivalente;
   }
-  return sheet;
+
+  const nueva = ss.insertSheet(CONFIG.SHEET_NAME);
+  nueva.appendRow(SHEET_COLUMNS_);
+  debugLog_('Pestaña de oportunidades creada', { nombre: CONFIG.SHEET_NAME });
+  return nueva;
 }
 
 /**

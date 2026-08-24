@@ -90,9 +90,34 @@ function mostrarDiagnostico() {
     const ss = sheet.getParent();
     lineas.push('Hoja de calculo en uso: ' + ss.getName());
     lineas.push('ID en uso: ' + ss.getId());
-    lineas.push('Pestaña de datos: ' + sheet.getName());
+    lineas.push('Pestaña que esta usando: ' + sheet.getName());
     lineas.push('Filas de datos: ' + Math.max(0, sheet.getLastRow() - 1));
     lineas.push('Oportunidades que devuelve la busqueda: ' + buscarOportunidadesPorTexto('').length);
+
+    // Todas las pestañas del fichero: si los datos estan en una y la
+    // aplicacion lee de otra, aqui se ve de un vistazo.
+    lineas.push('');
+    lineas.push('Pestañas de este fichero:');
+    ss.getSheets().forEach(function (s) {
+      const filas = Math.max(0, s.getLastRow() - 1);
+      const marca = (s.getSheetId() === sheet.getSheetId()) ? '  <-- en uso' : '';
+      lineas.push('  "' + s.getName() + '"  ' + filas + ' filas' + marca);
+    });
+
+    // Cabeceras: si no coinciden con las esperadas, se leen columnas
+    // equivocadas aunque la pestaña sea la correcta.
+    if (sheet.getLastRow() >= 1 && sheet.getLastColumn() >= 1) {
+      const cabeceras = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const esperadas = SHEET_COLUMNS_.join(' | ');
+      const reales = cabeceras.join(' | ');
+      lineas.push('');
+      lineas.push('Cabeceras esperadas: ' + esperadas);
+      lineas.push('Cabeceras reales   : ' + reales);
+      if (esperadas !== reales) {
+        lineas.push('AVISO: las cabeceras no coinciden. Se estan leyendo');
+        lineas.push('columnas equivocadas aunque la pestaña sea la buena.');
+      }
+    }
 
     const activa = SpreadsheetApp.getActiveSpreadsheet();
     if (activa && activa.getId() !== ss.getId()) {
