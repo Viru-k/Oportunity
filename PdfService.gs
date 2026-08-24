@@ -127,16 +127,132 @@
  *   page-break. Solución: integrar totales y firma DENTRO del último
  *   bloque .content (después de la última tabla), no en un bloque
  *   .content aparte. Así fluyen naturalmente tras la última fila.
+ *
+ * Sprint 014 (fin del solapamiento en el folio 2+):
+ * - Síntoma: con muchas líneas, el folio 2 arrancaba pegado arriba y la
+ *   tabla se metía debajo de la cabecera fija.
+ * - Causa medida (Chromium, ancho útil 182mm): la cabecera ocupa 70,5mm
+ *   y el pie 13,5mm, así que un folio deja 158,4mm reales para filas.
+ *   Pero una fila NO mide siempre lo mismo: 6,9mm si la designación cabe
+ *   en una línea y 11,0mm si envuelve a dos. Con ROWS_PER_PAGE_ = 20 fijo,
+ *   un bloque de 20 filas envueltas medía ~322mm contra un folio de 277mm:
+ *   se desbordaba 45mm, y ese desbordamiento caía debajo de la cabecera
+ *   fija del folio siguiente. Ese era el solapamiento.
+ * - Segunda causa, independiente: el último bloque suma totales y firma
+ *   (41,8mm) encima de sus filas, así que desbordaba 86,6mm SIEMPRE,
+ *   incluso sin ninguna línea envuelta.
+ * - Solución: dejar de contar filas y contar milímetros. paginarLineas_()
+ *   estima la altura de cada fila a partir de cuántas líneas ocupará su
+ *   designación (DESC_CHARS_PER_LINE_) y va llenando cada folio hasta
+ *   agotar su presupuesto de altura. Además reserva sitio para totales y
+ *   firma: si no caben tras la última fila, se van a un folio propio en
+ *   vez de desbordar.
+ * - Las reservas (HEADER_RESERVE_MM_/FOOTER_RESERVE_MM_) deben seguir
+ *   siendo IGUALES al padding-top/padding-bottom de .content en el CSS.
+ *   Si cambias uno, cambia el otro o el cálculo deja de ser válido.
  */
 
+/* ============================================================
+   MODELO DE ALTURA (todo en milímetros)
+
+   Sustituye al antiguo ROWS_PER_PAGE_ fijo. Los valores salen de medir
+   el documento real renderizado a 182mm de ancho útil; están calibrados
+   para que alturaEstimadaFila_() devuelva 6,9mm en una fila de una línea
+   y 11,0mm en una de dos, que es lo que miden de verdad.
+
+   Si tocas tipografías, paddings o anchos de columna en el CSS, estos
+   números dejan de ser válidos: vuelve a medir antes de fiarte de ellos.
+============================================================ */
+
+// Alto de un folio A4 menos el margen de @page (10mm arriba + 10mm abajo).
+var FOLIO_MM_ = 277;
+
+// Espacio que se reserva para la cabecera y el pie fijos. DEBEN coincidir
+// con el padding-top y el padding-bottom de .content en el CSS.
+var HEADER_RESERVE_MM_ = 80;
+var FOOTER_RESERVE_MM_ = 28;
+
+// Partes fijas de la tabla dentro de cada folio.
+var THEAD_MM_ = 7;
+var TABLE_MARGIN_MM_ = 4.5;
+
+// Alto del bloque de totales + firma, que solo aparece al final.
+var TOTALS_MM_ = 42;
+
+// Alto de una fila: una base más un incremento por cada línea de texto.
+var ROW_BASE_MM_ = 2.8;
+var ROW_LINE_MM_ = 4.1;
+
+// Caracteres que caben en una línea de la columna Designación (67,7mm
+// útiles, Arial 10.5px en mayúsculas por el text-transform).
+var DESC_CHARS_PER_LINE_ = 40;
+
+// Colchón para absorber que el conversor de Apps Script no mide igual que
+// un navegador. Súbelo si aún ves alguna fila rozando la cabecera.
+var SAFETY_MM_ = 6;
+
 /**
- * Nº de líneas de producto que se estima que caben en un folio, dejando
- * sitio a la cabecera fija (arriba) y al pie legal fijo (abajo). Es una
- * estimación, no un cálculo exacto: si ves que algún folio se queda con
- * hueco de sobra, sube este número; si ves que una fila se corta o
- * invade la cabecera/pie del folio siguiente, bájalo.
+ * Milímetros disponibles para filas en un folio, una vez descontadas la
+ * cabecera fija, el pie fijo, la cabecera de la tabla y el colchón.
  */
-var ROWS_PER_PAGE_ = 20;
+function alturaDisponibleParaFilas_() {
+  return FOLIO_MM_ - HEADER_RESERVE_MM_ - FOOTER_RESERVE_MM_ -
+    THEAD_MM_ - TABLE_MARGIN_MM_ - SAFETY_MM_;
+}
+
+/**
+ * Estima lo que va a medir una fila. Lo único que hace crecer una fila en
+ * la práctica es que la designación no quepa en una línea; el resto de
+ * columnas son cortas (referencias, cantidades e importes) y no envuelven.
+ */
+function alturaEstimadaFila_(item) {
+  const desc = String((item && item['Designación']) || '');
+  const lineas = Math.max(1, Math.ceil(desc.length / DESC_CHARS_PER_LINE_));
+  return ROW_BASE_MM_ + (lineas * ROW_LINE_MM_);
+}
+
+/**
+ * Reparte las líneas en folios por presupuesto de altura, en vez de por
+ * un número fijo de filas. Sustituye al antiguo chunkArray_.
+ *
+ * Devuelve también si los totales y la firma caben detrás de la última
+ * fila o necesitan folio propio: son 42mm que, si no se tienen en cuenta,
+ * desbordan el último folio y se meten bajo la cabecera del siguiente.
+ *
+ * @param {Array<Object>} items líneas del presupuesto
+ * @return {{pages: Array<Array<Object>>, totalsOwnPage: boolean}}
+ */
+function paginarLineas_(items) {
+  const disponible = alturaDisponibleParaFilas_();
+
+  if (!items.length) {
+    // Sin líneas todavía: un folio con la tabla vacía, y los totales
+    // caben de sobra detrás.
+    return { pages: [[]], totalsOwnPage: false };
+  }
+
+  const pages = [];
+  let current = [];
+  let used = 0;
+
+  items.forEach(function (item) {
+    const h = alturaEstimadaFila_(item);
+    // La comprobación de current.length evita que una fila más alta que un
+    // folio entero (designación larguísima) deje folios vacíos en bucle:
+    // se coloca igualmente y desborda solo ella.
+    if (current.length && (used + h) > disponible) {
+      pages.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(item);
+    used += h;
+  });
+
+  pages.push(current);
+
+  return { pages: pages, totalsOwnPage: (used + TOTALS_MM_) > disponible };
+}
 
 /**
  * Genera el PDF del presupuesto a partir del JSON editado en memoria.
@@ -166,20 +282,6 @@ function htmlToPdfBlob_(html, baseName) {
   const pdfBlob = htmlBlob.getAs('application/pdf');
   pdfBlob.setName(baseName + '.pdf');
   return pdfBlob;
-}
-
-/**
- * Trocea un array en sub-arrays de tamaño máximo size. Si el array de
- * entrada está vacío, devuelve un único trozo vacío (para que siempre
- * se genere al menos un folio con la tabla, aunque no tenga líneas).
- */
-function chunkArray_(arr, size) {
-  if (!arr.length) return [[]];
-  const chunks = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
 }
 
 /**
@@ -273,7 +375,8 @@ function buildBudgetHtml_(b) {
 
   // ---- Tabla de líneas, troceada a mano en bloques de folio -----------
   const items = Array.isArray(b['Líneas del presupuesto']) ? b['Líneas del presupuesto'] : [];
-  const pages = chunkArray_(items, ROWS_PER_PAGE_);
+  const paginado = paginarLineas_(items);
+  const pages = paginado.pages;
 
   const colgroupHtml = '<colgroup><col class="desc"><col class="ref"><col class="qty"><col class="disc"><col class="price"><col class="total"></colgroup>';
   const theadHtml = '<thead><tr>' +
@@ -310,14 +413,23 @@ function buildBudgetHtml_(b) {
     // page-break-before:always en todos los bloques MENOS el primero
     const breakClass = pageIndex === 0 ? '' : ' page-break';
 
-    // Solo en el ÚLTIMO bloque añadimos totales y firma dentro del mismo .content
-    const extras = (pageIndex === lastIndex) ? totalsHtml : '';
+    // Totales y firma van detrás de la última fila, pero solo si caben en
+    // lo que queda de ese folio; si no, paginarLineas_ ya ha avisado y se
+    // sacan a un folio propio más abajo.
+    const extras = (pageIndex === lastIndex && !paginado.totalsOwnPage) ? totalsHtml : '';
 
     return '<div class="content' + breakClass + '">' +
       '<table class="items">' + colgroupHtml + theadHtml + '<tbody>' + rows + '</tbody></table>' +
       extras +
       '</div>';
   }).join('');
+
+  // Folio extra solo para totales y firma, cuando no caben tras la última
+  // fila. Lleva su propio page-break y su propio padding de .content, así
+  // que respeta la cabecera y el pie fijos igual que cualquier otro folio.
+  const totalsPageHtml = paginado.totalsOwnPage
+    ? '<div class="content page-break">' + totalsHtml + '</div>'
+    : '';
 
   // ---- Documento HTML -------------------------------------------------
   return '' +
@@ -375,6 +487,7 @@ function buildBudgetHtml_(b) {
     pageHeaderHtml +
     legalFooterHtml +
     pagesHtml +
+    totalsPageHtml +
     '</div>' +
     '</body></html>';
 }

@@ -193,8 +193,19 @@
    buildBudgetHtml_ o el banco dejará de ser fiel.
 ============================================================ */
 
-// Espejo de ROWS_PER_PAGE_ en PdfService.gs. Mantener ambos iguales.
-const ROWS_PER_PAGE = 20;
+/* Espejo del MODELO DE ALTURA de PdfService.gs (Sprint 014).
+   Mantener ambos juegos de constantes iguales: aquí se afinan midiendo
+   en el navegador, allí es donde se usan de verdad. */
+const FOLIO_MM = 277;             // A4 menos el margen de @page (10 + 10)
+const HEADER_RESERVE_MM = 80;     // = padding-top de .content
+const FOOTER_RESERVE_MM = 28;     // = padding-bottom de .content
+const THEAD_MM = 7;
+const TABLE_MARGIN_MM = 4.5;
+const TOTALS_MM = 42;             // totales + firma
+const ROW_BASE_MM = 2.8;
+const ROW_LINE_MM = 4.1;
+const DESC_CHARS_PER_LINE = 40;   // columna Designación, 67,7mm útiles
+const SAFETY_MM = 6;
 
 // Espejo de COMPANY en Config.gs.
 const COMPANY = {
@@ -270,14 +281,38 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Espejo de chunkArray_.
-function chunkArray(arr, size) {
-  if (!arr.length) return [[]];
-  const chunks = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
+// Espejo de alturaDisponibleParaFilas_ / alturaEstimadaFila_ / paginarLineas_.
+function alturaDisponibleParaFilas() {
+  return FOLIO_MM - HEADER_RESERVE_MM - FOOTER_RESERVE_MM - THEAD_MM - TABLE_MARGIN_MM - SAFETY_MM;
+}
+
+function alturaEstimadaFila(item) {
+  const desc = String((item && item['Designación']) || '');
+  const lineas = Math.max(1, Math.ceil(desc.length / DESC_CHARS_PER_LINE));
+  return ROW_BASE_MM + (lineas * ROW_LINE_MM);
+}
+
+function paginarLineas(items) {
+  const disponible = alturaDisponibleParaFilas();
+  if (!items.length) return { pages: [[]], totalsOwnPage: false };
+
+  const pages = [];
+  let current = [];
+  let used = 0;
+
+  items.forEach(function (item) {
+    const h = alturaEstimadaFila(item);
+    if (current.length && (used + h) > disponible) {
+      pages.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(item);
+    used += h;
+  });
+
+  pages.push(current);
+  return { pages: pages, totalsOwnPage: (used + TOTALS_MM) > disponible };
 }
 
 // Espejo de buildBudgetHtml_.
@@ -354,7 +389,8 @@ function buildBudgetHtml(b) {
     '</div>';
 
   const items = Array.isArray(b['Líneas del presupuesto']) ? b['Líneas del presupuesto'] : [];
-  const pages = chunkArray(items, ROWS_PER_PAGE);
+  const paginado = paginarLineas(items);
+  const pages = paginado.pages;
 
   const colgroupHtml = '<colgroup><col class="desc"><col class="ref"><col class="qty"><col class="disc"><col class="price"><col class="total"></colgroup>';
   const theadHtml = '<thead><tr>' +
@@ -388,7 +424,7 @@ function buildBudgetHtml(b) {
     }).join('');
 
     const breakClass = pageIndex === 0 ? '' : ' page-break';
-    const extras = (pageIndex === lastIndex) ? totalsHtml : '';
+    const extras = (pageIndex === lastIndex && !paginado.totalsOwnPage) ? totalsHtml : '';
 
     return '<div class="content' + breakClass + '">' +
       '<table class="items">' + colgroupHtml + theadHtml + '<tbody>' + rows + '</tbody></table>' +
@@ -396,7 +432,11 @@ function buildBudgetHtml(b) {
       '</div>';
   }).join('');
 
-  return pageHeaderHtml + legalFooterHtml + pagesHtml;
+  const totalsPageHtml = paginado.totalsOwnPage
+    ? '<div class="content page-break">' + totalsHtml + '</div>'
+    : '';
+
+  return pageHeaderHtml + legalFooterHtml + pagesHtml + totalsPageHtml;
 }
 
 document.getElementById('page').innerHTML = buildBudgetHtml(BUDGET);
