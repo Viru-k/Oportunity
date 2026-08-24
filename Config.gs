@@ -13,7 +13,14 @@ const CONFIG = {
   TEMPERATURE: 0.1,
 
   // --- Sprint 005: persistencia de oportunidades ---
-  SHEET_NAME: 'Oportunidades',
+  // Pestaña de datos. Se estrena una nueva para partir de cero, dejando
+  // intacta la anterior ('Oportunidades') con su historico: alli hay
+  // presupuestos con importes a cero por extracciones incompletas, y
+  // mezclarlos con los nuevos solo enturbiaria el listado.
+  SHEET_NAME: 'Oportunidades v2',
+
+  // Tipo de IVA aplicado al calcular los importes (BudgetNormalizer.gs).
+  IVA_RATE: 0.21,
   OP_PREFIX: 'OP-',
   OP_PAD_LENGTH: 6,
   LOCK_TIMEOUT_MS: 30000

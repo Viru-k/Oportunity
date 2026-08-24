@@ -35,12 +35,16 @@ function procesarOportunidad(images) {
  * generación del PDF en PdfService.gs; no implementa reglas de negocio
  * propias.
  *
+ * Todo guardado pasa antes por normalizarImportes (BudgetNormalizer.gs),
+ * para que lo que se escribe en la hoja tenga siempre los importes
+ * cuadrados, venga como venga de la extracción y edite el usuario o no.
+ *
  * @param {Object} budget JSON de presentación (español) revisado por el usuario
  * @param {string|null} uuid uuid existente, o null/undefined si es nueva
  * @return {{base64: string, filename: string, uuid: string, budget: Object}}
  */
 function generarPdf(budget, uuid) {
-  const saved = guardarOportunidadEnHoja(budget, uuid);
+  const saved = guardarOportunidadEnHoja(normalizarImportes(budget), uuid);
   const pdf = generarPdfPresupuesto(saved.budget);
   enviarABitacora_(saved.budget, saved.uuid);
   return {
@@ -62,7 +66,7 @@ function generarPdf(budget, uuid) {
  * @return {{uuid: string, budget: Object}}
  */
 function guardarOportunidad(budget, uuid) {
-  const saved = guardarOportunidadEnHoja(budget, uuid);
+  const saved = guardarOportunidadEnHoja(normalizarImportes(budget), uuid);
   enviarABitacora_(saved.budget, saved.uuid);
   return saved;
 }
