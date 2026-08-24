@@ -21,6 +21,11 @@ const CONFIG = {
 
   // Tipo de IVA aplicado al calcular los importes (BudgetNormalizer.gs).
   IVA_RATE: 0.21,
+
+  // Maximo de presupuestos que devuelve el listado de una vez. La pantalla
+  // se los trae todos al entrar y filtra en local, asi que este numero es
+  // el techo de lo que se puede buscar sin volver al servidor.
+  MAX_LISTADO: 1000,
   OP_PREFIX: 'OP-',
   OP_PAD_LENGTH: 6,
   LOCK_TIMEOUT_MS: 30000

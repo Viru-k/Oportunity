@@ -204,12 +204,22 @@ function buscarOportunidadesPorTexto(query) {
       telefono: telefono,
       fecha: row[COL_FECHA_ - 1],
       modificado: row[COL_MODIFICADO_ - 1],
-      total: total
+      total: total,
+      // Texto ya normalizado por el que se puede filtrar. Viaja con cada
+      // resultado para que el buscador de la pantalla filtre en el propio
+      // navegador, al instante, sin una llamada al servidor por tecla y
+      // sin tener que repetir aqui la tabla de acentos.
+      busqueda: haystack
     });
   });
 
   results.sort(function (a, b) { return new Date(b.modificado) - new Date(a.modificado); });
-  return words.length === 0 ? results.slice(0, 200) : results;
+
+  // Tope de seguridad para no devolver un listado inmanejable el dia que
+  // haya miles de presupuestos. Se aplica siempre, tambien al listar sin
+  // filtro, porque la pantalla se trae la lista entera una sola vez y
+  // luego filtra en local.
+  return results.slice(0, CONFIG.MAX_LISTADO);
 }
 
 /**
