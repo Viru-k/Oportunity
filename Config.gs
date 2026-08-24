@@ -78,13 +78,40 @@ function getOpenRouterApiKey_() {
  * persisten las oportunidades (OpportunityRepository.gs). Mismo patrón
  * que getOpenRouterApiKey_(): nunca se hardcodea, siempre en Script
  * Properties.
+ *
+ * Respaldo: si SPREADSHEET_ID no está configurada y el script está
+ * vinculado a una hoja de cálculo (que es como se usa: Oportunity se
+ * lanza desde una hoja en Drive), se usa esa misma hoja. Así la pestaña
+ * de Oportunidades se crea sola dentro del fichero desde el que abres la
+ * aplicación, sin tener que configurar nada a mano.
+ *
+ * La propiedad sigue mandando cuando existe: configúrala si algún día
+ * quieres persistir en una hoja distinta de la que abre la aplicación.
+ * El respaldo solo entra cuando no hay propiedad, así que no cambia el
+ * destino de ninguna instalación que ya la tenga puesta.
  */
 function getSpreadsheetId_() {
   const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  if (!id) {
-    throw new Error('Falta configurar SPREADSHEET_ID en Script Properties.');
+  if (id) return id;
+
+  // getActiveSpreadsheet() devuelve null en un script independiente, y
+  // lanza excepción en algunos contextos de ejecución; ninguno de los dos
+  // casos debe enmascarar el mensaje de configuración de más abajo.
+  let bound = null;
+  try {
+    bound = SpreadsheetApp.getActiveSpreadsheet();
+  } catch (e) {
+    bound = null;
   }
-  return id;
+
+  if (bound) {
+    return bound.getId();
+  }
+
+  throw new Error(
+    'Falta configurar SPREADSHEET_ID en Script Properties ' +
+    '(y este script no está vinculado a ninguna hoja de cálculo).'
+  );
 }
 
 /**

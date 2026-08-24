@@ -98,6 +98,11 @@ function _diagnosticoDesdeWebApp() {
     return {
       ok: true,
       ssId: ssId,
+      // De donde sale el ID: util para saber si esta guardando en la hoja
+      // desde la que se abre la aplicacion o en otra configurada a mano.
+      origenSsId: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')
+        ? 'Script Properties'
+        : 'hoja vinculada al script',
       ssNombre: sheet.getParent().getName(),
       hoja: sheet.getName(),
       ultimaFila: sheet.getLastRow(),
