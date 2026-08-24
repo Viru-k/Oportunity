@@ -13,11 +13,18 @@ const CONFIG = {
   TEMPERATURE: 0.1,
 
   // --- Sprint 005: persistencia de oportunidades ---
-  // Pestaña de datos. Se estrena una nueva para partir de cero, dejando
-  // intacta la anterior ('Oportunidades') con su historico: alli hay
-  // presupuestos con importes a cero por extracciones incompletas, y
-  // mezclarlos con los nuevos solo enturbiaria el listado.
-  SHEET_NAME: 'Oportunidades v2',
+  // Pestaña de datos.
+  //
+  // Se probo a estrenar una pestaña nueva ('Oportunidades v2') para partir
+  // de cero, pero los guardados siguieron cayendo en 'Oportunidades' y la
+  // aplicacion leia de la nueva, vacia: el listado salia a cero teniendo 78
+  // presupuestos guardados. Se vuelve a la pestaña de siempre, que es la
+  // que tiene los datos, para que leer y escribir apunten al mismo sitio.
+  //
+  // El motivo por el que se queria empezar de cero (presupuestos con los
+  // importes a cero) ya no depende de la pestaña: lo resuelve
+  // BudgetNormalizer.gs en cada guardado.
+  SHEET_NAME: 'Oportunidades',
 
   // Tipo de IVA aplicado al calcular los importes (BudgetNormalizer.gs).
   IVA_RATE: 0.21,
