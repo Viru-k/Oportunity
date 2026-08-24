@@ -108,7 +108,26 @@ function _diagnosticoDesdeWebApp() {
       ultimaFila: sheet.getLastRow(),
       usuarioEfectivo: Session.getEffectiveUser().getEmail(),
       usuarioActivo: (function () { try { return Session.getActiveUser().getEmail(); } catch (e) { return '(sin permiso para verlo)'; } })(),
-      resultadosBusquedaDirecta: resultadoBusqueda.length
+      resultadosBusquedaDirecta: resultadoBusqueda.length,
+
+      // Cabeceras reales de la pestaña. Si no coinciden con las esperadas
+      // (UUID, OP, Cliente, Telefono, Fecha, Modificado, JSON) se estan
+      // leyendo columnas equivocadas aunque la pestaña sea la correcta.
+      cabecerasEsperadas: SHEET_COLUMNS_,
+      cabecerasReales: (sheet.getLastColumn() >= 1)
+        ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+        : [],
+
+      // Que ve la busqueda en las tres columnas por las que filtra. Si
+      // salen vacias, cualquier texto devolvera cero resultados.
+      muestraDeBusqueda: resultadoBusqueda.slice(0, 3).map(function (r) {
+        return { op: r.op, cliente: r.cliente, telefono: r.telefono };
+      }),
+
+      // Todas las pestañas del fichero, por si los datos estuvieran en otra.
+      pestanas: sheet.getParent().getSheets().map(function (s) {
+        return s.getName() + ' (' + Math.max(0, s.getLastRow() - 1) + ')';
+      })
     };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
