@@ -3,487 +3,404 @@
 <head>
 <meta charset="UTF-8">
 <title>Lista de compra — OP-000001</title>
+
+<!-- ============================================================
+     BANCO DE PRUEBAS DEL PDF
+     ============================================================
+
+     Este archivo NO se sube a Apps Script. Existe para poder ajustar
+     el diseño del PDF en el navegador, sin recargar el proyecto GAS
+     entero en cada prueba.
+
+     Reproduce lo que hace buildBudgetHtml_() en PdfService.gs:
+       - el mismo CSS, carácter a carácter (ver BLOQUE SINCRONIZADO)
+       - el mismo troceado manual en bloques de folio (ROWS_PER_PAGE)
+       - la misma estructura de nodos (.page-header, .legal-footer,
+         .content, tabla, totales y firma en el último bloque)
+       - los mismos formateadores de número (sin símbolo de moneda)
+
+     CÓMO TRABAJAR AQUÍ
+     1. Abre este archivo en el navegador y toca lo que quieras
+        dentro del BLOQUE SINCRONIZADO.
+     2. Comprueba el resultado con "Imprimir / Guardar como PDF"
+        (Chrome, A4, sin márgenes del navegador).
+     3. Cuando te guste, copia ese CSS tal cual a PdfService.gs, a la
+        cadena de <style> de buildBudgetHtml_. Como es el mismo texto,
+        no hay que reinterpretar nada: se pega y ya.
+
+     REGLAS PARA QUE ESTO SIGA SIENDO FIEL
+     - Todo lo que sea solo para ver esto en pantalla (fondo gris,
+       sombra del folio, botón de imprimir) vive en @media screen y
+       NUNCA se copia a PdfService.gs.
+     - Si cambias la estructura de nodos, cámbiala también en
+       buildBudgetHtml_. Si solo cambias CSS, basta con copiar el
+       bloque.
+
+     LO QUE ESTE BANCO NO PUEDE PREDECIR
+     El PDF real no lo genera Chrome, sino el conversor de Apps Script
+     (Utilities / getAs). Ese motor es bastante más limitado, y ahí se
+     estrellaron los Sprints 010-011 (ver la cabecera de PdfService.gs):
+     @page no frena una tabla que se repagina sola, y thead/tfoot no se
+     repiten por folio. Lo que sí se repite de forma fiable en cada
+     folio es position:fixed, y por eso la cabecera y el pie legal lo
+     usan.
+
+     Traducción práctica: fíate de este banco para tipografía, colores,
+     anchos de columna y espaciados. Para cualquier cosa que toque
+     saltos de página o el anclaje de la cabecera/pie, verifica siempre
+     con un PDF generado de verdad desde Apps Script antes de darlo por
+     bueno.
+============================================================ -->
+
 <style>
+/* ============================================================
+   BLOQUE SINCRONIZADO — copia literal del <style> que
+   buildBudgetHtml_() escribe en PdfService.gs.
 
-  /* ============================================================
-     TOKENS
-     Documento clásico de trabajo: blanco y negro, sin acentos de
-     color. La distribución en bloques replica deliberadamente la
-     del presupuesto oficial (misma retícula, mismos tamaños
-     relativos, misma tabla con rejilla completa); el contenido de
-     cada bloque es el que marca la diferencia.
-  ============================================================ */
-  :root {
-    --ink: #000000;
-    --ink-soft: #333333;
-    --ink-muted: #6a6a6a;
-    --line: #000000;
-    --line-soft: #999999;
-    --head-bg: #dcdcdc;
-
+   Lo que cambies aquí se copia y pega allí sin tocar nada más.
+   ============================================================ */
+  :root{
+    --ink:#000000; --ink-soft:#333333; --ink-muted:#6a6a6a;
+    --line:#000000; --line-soft:#999999; --head-bg:#dcdcdc;
     --font: Arial, Helvetica, 'Liberation Sans', sans-serif;
   }
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}
+  html{height:100%;}
+  body{margin:0;font-family:var(--font);color:var(--ink);font-size:11px;line-height:1.45;height:100%;}
+  @page{size:A4;margin:10mm 14mm 10mm 14mm;}
+  .page-break{page-break-before:always;break-before:page;}
+  .page-header{position:fixed;top:8mm;left:14mm;right:14mm;}
+  .legal-footer{position:fixed;left:14mm;right:14mm;bottom:0;}
+  .content{padding-top:80mm;padding-bottom:28mm;}
+  .doc-header{display:grid;grid-template-columns:1fr 2fr 1fr;align-items:start;margin-bottom:14px;}
+  .doc-header .side{min-height:1px;}
+  .doc-title-block{text-align:center;}
+  .doc-title-block .doc-type{font-size:22px;font-weight:700;letter-spacing:0.02em;}
+  .doc-title-block .doc-number{font-size:16px;font-weight:700;margin-top:3px;}
+  .doc-title-block .doc-date{font-size:13px;color:var(--ink-soft);margin-top:3px;}
+  .parties{display:grid;grid-template-columns:1fr 1fr;column-gap:140px;margin-bottom:10px;}
+  .upper{text-transform:uppercase;}
+  .party-name{font-size:13px;font-weight:700;}
+  .party-line{color:var(--ink-soft);margin-top:2px;}
+  .attended-row{display:grid;grid-template-columns:1fr 1fr;column-gap:60px;margin-bottom:18px;}
+  .courtesy{text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:0.01em;margin-bottom:20px;}
+  .courtesy div + div{margin-top:2px;}
+  table.items{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:16px;}
+  table.items col.desc{width:39%;} table.items col.ref{width:13%;} table.items col.qty{width:8%;}
+  table.items col.disc{width:10%;} table.items col.price{width:13%;} table.items col.total{width:17%;}
+  table.items th, table.items td{border:1px solid var(--line);padding:5px 6px;vertical-align:top;text-align:center;}
+  table.items thead th{background:var(--head-bg);font-size:9px;font-weight:700;text-align:center;white-space:nowrap;}
+  table.items td.desc{text-align:left;text-transform:uppercase;}
+  table.items tbody td{font-size:10.5px;overflow-wrap:break-word;}
+  table.items td.num{font-variant-numeric:tabular-nums;}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:30px;}
+  .totals{width:72mm;}
+  .totals-row{display:flex;justify-content:space-between;padding:2px 0;}
+  .totals-row.bold{font-weight:700;}
+  .totals-row.final{font-weight:700;font-size:13px;margin-top:5px;}
+  .totals-row.final .num{display:inline-block;border-top:1px solid var(--line);padding-top:4px;}
+  .signature-wrap{display:flex;justify-content:flex-end;margin-bottom:22px;}
+  .signature{width:62mm;border:1px solid var(--line);padding:30px 10px 8px;font-size:10.5px;}
+  .totals-signature{page-break-inside:avoid;break-inside:avoid;}
+  .legal{border-top:1px solid var(--line-soft);padding-top:7px;font-size:8px;color:var(--ink-muted);line-height:1.55;text-align:justify;}
+  .legal p{margin:0 0 6px;}
+  .legal strong{color:var(--ink-soft);font-weight:700;}
+/* ============================================================
+   FIN DEL BLOQUE SINCRONIZADO
+   ============================================================ */
 
-  * { box-sizing: border-box; }
+/* ============================================================
+   SOLO PANTALLA — andamiaje de este banco de pruebas.
+   NO copiar a PdfService.gs.
+   ============================================================ */
+@media screen {
+  html { background:#e9e9e7; }
 
-  html { background: #e9e9e7; }
+  body { padding-bottom:60px; }
 
-  body {
-    margin: 0;
-    font-family: var(--font);
-    color: var(--ink);
-  }
-
-  /* ============================================================
-     BARRA DE HERRAMIENTAS (solo pantalla)
-  ============================================================ */
   .toolbar {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    display: flex;
-    justify-content: center;
-    padding: 14px 0;
-    background: #e9e9e7;
-    border-bottom: 1px solid #d3d3d0;
+    position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; justify-content:center; gap:16px;
+    padding:12px 16px;
+    background:#e9e9e7; border-bottom:1px solid #d3d3d0;
+    font-size:12px; color:#555;
   }
 
   .toolbar button {
-    font-family: var(--font);
-    font-size: 14px;
-    font-weight: 700;
-    color: #fff;
-    background: #222;
-    border: none;
-    border-radius: 4px;
-    padding: 11px 20px;
-    cursor: pointer;
+    font-family:var(--font); font-size:13px; font-weight:700;
+    color:#fff; background:#222; border:none; border-radius:4px;
+    padding:9px 16px; cursor:pointer;
   }
 
-  .toolbar button:hover { background: #000; }
+  .toolbar button:hover { background:#000; }
 
-  /* ============================================================
-     LIENZO / PÁGINA (A4)
-  ============================================================ */
+  .toolbar .hint { max-width:520px; line-height:1.4; }
+
+  /* En pantalla la cabecera y el pie fijos se pegarían a la ventana.
+     Se sueltan a flujo normal para poder revisarlos leyendo hacia
+     abajo; al imprimir vuelven a ser fixed y se repiten por folio,
+     que es como se comportan en el PDF real. */
+  .page-header, .legal-footer {
+    position:static; left:auto; right:auto; top:auto; bottom:auto;
+  }
+
+  .content { padding-top:16px; padding-bottom:16px; }
+
+  /* Marca visual de dónde caería cada salto de folio. */
+  .page-break {
+    border-top:2px dashed #b9b9b4;
+    margin-top:26px; padding-top:10px;
+    position:relative;
+  }
+
+  .page-break::before {
+    content:'salto de folio';
+    position:absolute; top:-9px; left:0;
+    background:#e9e9e7; padding:0 8px;
+    font-size:10px; color:#999; letter-spacing:.04em;
+  }
+
   .page {
-    width: 210mm;
-    min-height: 297mm;
-    margin: 28px auto 60px;
-    background: #ffffff;
-    box-shadow: 0 0 0 1px #d3d3d0, 0 8px 24px rgba(0,0,0,0.08);
-    padding: 14mm 16mm 12mm;
-    font-size: 11px;
-    line-height: 1.45;
-    display: flex;
-    flex-direction: column;
+    width:210mm; margin:22px auto;
+    background:#fff;
+    box-shadow:0 0 0 1px #d3d3d0, 0 8px 24px rgba(0,0,0,0.08);
+    padding:14mm;
   }
-
-  .content { flex: 1 0 auto; }
-
-  /* Bloque firma + pie: siempre pegado al final de la página. En este
-     boceto de una sola página basta con empujarlo con margin-top:auto.
-     LIMITACIÓN DE APPS SCRIPT: cuando el documento ocupe varias páginas,
-     "anclar al fondo de cada página" y "firma solo en la última página"
-     requieren paginación real (CSS Paged Media / running elements), que
-     no está soportada de forma fiable por el motor de conversión HTML→PDF
-     de Apps Script (Utilities.getAs). Habrá que resolverlo en la fase de
-     integración, probablemente calculando manualmente los saltos de
-     página; no se puede dar por hecho que funcione igual que aquí. */
-  .bottom-block { margin-top: auto; }
-
-  /* ============================================================
-     CABECERA
-     Retícula de 3 columnas idéntica en proporción a la del
-     documento oficial (zona izquierda / bloque de título central /
-     zona derecha). Se eliminan logo y código de barras: las zonas
-     laterales quedan vacías en vez de ocupadas por elementos de
-     marca, conservando el ritmo y el equilibrio del original.
-  ============================================================ */
-  .doc-header {
-    display: grid;
-    grid-template-columns: 1fr 2fr 1fr;
-    align-items: start;
-    margin-bottom: 14px;
-  }
-
-  .doc-header .side { min-height: 1px; }
-
-  .doc-title-block {
-    text-align: center;
-  }
-
-  .doc-title-block .doc-type {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-  }
-
-  .doc-title-block .doc-number {
-    font-size: 16px;
-    font-weight: 700;
-    margin-top: 3px;
-  }
-
-  .doc-title-block .doc-date {
-    font-size: 13px;
-    color: var(--ink-soft);
-    margin-top: 3px;
-  }
-
-  /* ============================================================
-     BLOQUE DE PARTES (empresa / cliente + atendido por)
-     Misma retícula de dos columnas que el original, con la misma
-     secuencia: nombre en negrita, líneas de dirección, línea en
-     blanco, teléfono; fila siguiente con "atendido por" a la
-     izquierda. La columna derecha de esa fila (antes "Nº cliente")
-     se deja vacía: ese dato no existe en Oportunity.
-  ============================================================ */
-  .parties {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 140px;
-    margin-bottom: 10px;
-  }
-
-  .upper { text-transform: uppercase; }
-
-  .party-name { font-size: 13px; font-weight: 700; }
-
-  .party-line { color: var(--ink-soft); margin-top: 2px; }
-
-  .party-spacer { height: 11px; }
-
-  .attended-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 60px;
-    margin-bottom: 18px;
-  }
-
-  /* ============================================================
-     MENSAJE DE CORTESÍA
-     Dos líneas centradas en mayúsculas y negrita, igual que en el
-     original ("LEROY MERLIN te agradece tu confianza." /
-     "PRESUPUESTO ENTREGADO..."), sustituidas por un mensaje neutro
-     que no menciona la marca ni la palabra "presupuesto".
-  ============================================================ */
-  .courtesy {
-    text-align: center;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.01em;
-    margin-bottom: 20px;
-  }
-
-  .courtesy div + div { margin-top: 2px; }
-
-  /* ============================================================
-     TABLA
-     Rejilla completa (bordes en todas las celdas) y cabecera
-     sombreada en gris claro, igual que el documento oficial. Se
-     elimina la columna "Tipo IVA" (dato fiscal sin sentido aquí)
-     y se sustituye por "%" de descuento por línea; se elimina el
-     doble código EAN/Ref, dejando una única referencia.
-  ============================================================ */
-  table.items {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    margin-bottom: 16px;
-  }
-
-  table.items col.desc  { width: 39%; }
-  table.items col.ref   { width: 13%; }
-  table.items col.qty   { width: 8%;  }
-  table.items col.disc  { width: 10%; }
-  table.items col.price { width: 13%; }
-  table.items col.total { width: 17%; }
-
-  table.items th,
-  table.items td {
-    border: 1px solid var(--line);
-    padding: 5px 6px;
-    vertical-align: top;
-    text-align: center;
-  }
-
-  table.items thead th {
-    background: var(--head-bg);
-    font-size: 9px;
-    font-weight: 700;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  table.items td.desc { text-align: left; text-transform: uppercase; }
-
-  table.items tbody td { font-size: 10.5px; overflow-wrap: break-word; }
-
-  table.items td.num {
-    font-variant-numeric: tabular-nums;
-  }
-
-  table.items .note {
-    display: block;
-    font-size: 9px;
-    font-style: italic;
-    font-weight: 400;
-    text-transform: none;
-    color: var(--ink-muted);
-    margin-top: 1px;
-  }
-
-  /* ============================================================
-     TOTALES
-     Bloque simple alineado a la derecha, sin filetes decorativos,
-     igual que el original: dos líneas normales y una tercera en
-     negrita de mayor tamaño para el total final.
-  ============================================================ */
-  .totals-wrap {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 30px;
-  }
-
-  .totals { width: 72mm; }
-
-  .totals-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 2px 0;
-  }
-
-  .totals-row.bold { font-weight: 700; }
-
-  .totals-row.final {
-    font-weight: 700;
-    font-size: 13px;
-    margin-top: 5px;
-  }
-
-  .totals-row.final .num {
-    display: inline-block;
-    border-top: 1px solid var(--line);
-    padding-top: 4px;
-  }
-
-  /* ============================================================
-     FIRMA
-  ============================================================ */
-  .signature-wrap {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 22px;
-  }
-
-  .signature {
-    width: 62mm;
-    border: 1px solid var(--line);
-    padding: 30px 10px 8px;
-    font-size: 10.5px;
-  }
-
-  /* ============================================================
-     PIE
-     Sustituye el bloque legal RGPD del original (tratamiento de
-     datos, legitimación, derechos ARCO...) por un bloque de avisos
-     propios de una lista de compra, con el mismo peso visual:
-     letra pequeña, gris, varias líneas, sin protagonismo pero
-     presente — es lo que da al documento su aspecto profesional.
-  ============================================================ */
-  .legal {
-    border-top: 1px solid var(--line-soft);
-    padding-top: 7px;
-    font-size: 8px;
-    color: var(--ink-muted);
-    line-height: 1.55;
-    text-align: justify;
-  }
-
-  .legal p { margin: 0 0 6px; }
-
-  .legal strong {
-    color: var(--ink-soft);
-    font-weight: 700;
-  }
-
-  .legal .page-num {
-    text-align: center;
-  }
-
-  /* ============================================================
-     IMPRESIÓN
-  ============================================================ */
-  @media print {
-    html, body { background: #ffffff; }
-    .toolbar { display: none; }
-    .page {
-      width: auto;
-      min-height: calc(297mm - 28mm);
-      margin: 0;
-      padding: 0;
-      box-shadow: none;
-    }
-    @page {
-      size: A4;
-      margin: 14mm 15mm;
-    }
-    table.items tbody tr,
-    .totals-wrap, .signature { break-inside: avoid; }
-  }
-
+}
 </style>
 </head>
 <body>
 
   <div class="toolbar">
     <button onclick="window.print()">📄 Imprimir / Guardar como PDF</button>
+    <span class="hint">
+      Ajusta el <strong>bloque sincronizado</strong> del CSS y cópialo tal cual a
+      <code>PdfService.gs</code>. Verifica los saltos de página con un PDF real de Apps Script.
+    </span>
   </div>
 
-  <div class="page">
+  <div class="page" id="page"></div>
 
-    <div class="content">
+<script>
+/* ============================================================
+   Réplica de buildBudgetHtml_() de PdfService.gs.
 
-    <div class="doc-header">
-      <div class="side"></div>
-      <div class="doc-title-block">
-        <div class="doc-type">LISTA DE COMPRA</div>
-        <div class="doc-number">OP-000001</div>
-        <div class="doc-date">Fecha: 19/07/2026</div>
-      </div>
-      <div class="side"></div>
-    </div>
+   Misma estructura de nodos y mismo troceado manual. Lo único
+   distinto son los datos: aquí son de ejemplo, allí vienen del
+   JSON de presentación que devuelve PresentationMapper.gs.
 
-    <div class="parties">
-      <div>
-        <div class="party-name">Leroy Merlin Valladolid</div>
-        <div class="party-line">Avda. de Salamanca, 24</div>
-        <div class="party-line">47008 Valladolid</div>
-        <div class="party-spacer"></div>
-        <div class="party-line">Tel. tienda: 983 210 400</div>
-      </div>
-      <div>
-        <div class="party-name upper">Juan Pérez García</div>
-        <div class="party-line">Teléfono: 612 345 678</div>
-      </div>
-    </div>
+   Si tocas la ESTRUCTURA (no solo el CSS), replica el cambio en
+   buildBudgetHtml_ o el banco dejará de ser fiel.
+============================================================ */
 
-    <div class="attended-row">
-      <div class="party-line">Ha sido atendido por: <span class="upper">Carlos Sánchez</span></div>
-      <div></div>
-    </div>
+// Espejo de ROWS_PER_PAGE_ en PdfService.gs. Mantener ambos iguales.
+const ROWS_PER_PAGE = 20;
 
-    <div class="courtesy">
-      <div>GRACIAS POR SU CONFIANZA EN ESTE PROYECTO.</div>
-      <div>DOCUMENTO ELABORADO PARA FACILITAR LA COMPRA DE LOS MATERIALES.</div>
-    </div>
+// Espejo de COMPANY en Config.gs.
+const COMPANY = {
+  NAME: 'Leroy Merlin LA CORUNA',
+  ADDRESS_LINE_1: 'c.c Marineda City',
+  ADDRESS_LINE_2: '15008 LA CORUNA',
+  PHONE: '881 900 900'
+};
 
-    <table class="items">
-      <colgroup>
-        <col class="desc"><col class="ref"><col class="qty">
-        <col class="disc"><col class="price"><col class="total">
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Designación</th>
-          <th>Referencia</th>
-          <th>Ctd</th>
-          <th>Tipo IVA</th>
-          <th>Precio Unitario €</th>
-          <th>Importe con IVA</th>
-        </tr>
-      </thead>
-      <tbody id="itemsBody"></tbody>
-    </table>
+/* Presupuesto de ejemplo, con las claves en español exactas que
+   produce PresentationMapper.gs. 24 líneas: suficientes para que
+   salten dos folios con ROWS_PER_PAGE = 20 y poder revisar cómo
+   se comporta la cabecera repetida. */
+const BUDGET = {
+  'Presupuesto': 'OP-000001',
+  'Fecha': '19/07/2026',
+  'Vendedor': 'Carlos Sánchez',
+  'Cliente': 'Juan Pérez García',
+  'Teléfono': '612 345 678',
+  'Dirección': 'Rúa Nueva, 14, 3º B',
+  'Correo electrónico': 'juan.perez@example.com',
+  'Líneas del presupuesto': [
+    { 'Referencia':'PC-20120-GR', 'Designación':'Pavimento porcelánico 20x120 cm, acabado mate gris', 'Cantidad':42, 'Precio €':24.90, '%':10, 'Total':940.98, 'Línea':1 },
+    { 'Referencia':'AD-C2-25KG',  'Designación':'Adhesivo cementoso C2 flexible, saco 25 kg', 'Cantidad':6, 'Precio €':18.40, '%':0, 'Total':110.40, 'Línea':2 },
+    { 'Referencia':'MR-FLEX-20',  'Designación':'Mortero autonivelante flexible, saco 20 kg', 'Cantidad':4, 'Precio €':21.10, '%':0, 'Total':84.40, 'Línea':3 },
+    { 'Referencia':'RD-ALU-260',  'Designación':'Rodapié de aluminio anodizado, barra 2,60 m', 'Cantidad':14, 'Precio €':9.75, '%':5, 'Total':129.68, 'Línea':4 },
+    { 'Referencia':'CU-NIV-100',  'Designación':'Cuñas de nivelación, bolsa 100 unidades', 'Cantidad':3, 'Precio €':6.20, '%':0, 'Total':18.60, 'Línea':5 },
+    { 'Referencia':'CR-NIV-2MM',  'Designación':'Crucetas de nivelación 2 mm, bolsa 250 unidades', 'Cantidad':3, 'Precio €':5.85, '%':0, 'Total':17.55, 'Línea':6 },
+    { 'Referencia':'PF-ALU-270',  'Designación':'Perfil de aluminio de remate, barra 2,70 m', 'Cantidad':8, 'Precio €':11.30, '%':8, 'Total':83.17, 'Línea':7 },
+    { 'Referencia':'JU-GRIS-5KG', 'Designación':'Junta cementosa gris antimoho, envase 5 kg', 'Cantidad':2, 'Precio €':14.60, '%':0, 'Total':29.20, 'Línea':8 },
+    { 'Referencia':'LM-IMPER-10', 'Designación':'Lámina impermeabilizante bajo suelo, rollo 10 m²', 'Cantidad':5, 'Precio €':32.00, '%':12, 'Total':140.80, 'Línea':9 },
+    { 'Referencia':'SI-NEU-300',  'Designación':'Silicona neutra universal, cartucho 300 ml', 'Cantidad':10, 'Precio €':4.45, '%':0, 'Total':44.50, 'Línea':10 },
+    { 'Referencia':'PN-YESO-13',  'Designación':'Panel de yeso laminado 13 mm, 2500x1200 mm', 'Cantidad':16, 'Precio €':12.85, '%':0, 'Total':205.60, 'Línea':11 },
+    { 'Referencia':'PF-OMEGA-30', 'Designación':'Perfil omega de acero galvanizado, barra 3,00 m', 'Cantidad':24, 'Precio €':4.10, '%':0, 'Total':98.40, 'Línea':12 },
+    { 'Referencia':'AI-LANA-45',  'Designación':'Aislante de lana mineral 45 mm, panel 1350x600 mm', 'Cantidad':30, 'Precio €':7.95, '%':6, 'Total':224.19, 'Línea':13 },
+    { 'Referencia':'TR-PLAD-25',  'Designación':'Tornillo para placa de yeso 25 mm, caja 500 uds', 'Cantidad':4, 'Precio €':8.30, '%':0, 'Total':33.20, 'Línea':14 },
+    { 'Referencia':'CT-PAPEL-50', 'Designación':'Cinta de juntas de papel microperforado, rollo 50 m', 'Cantidad':6, 'Precio €':3.75, '%':0, 'Total':22.50, 'Línea':15 },
+    { 'Referencia':'PA-JUNTA-20', 'Designación':'Pasta de juntas lista al uso, envase 20 kg', 'Cantidad':3, 'Precio €':19.40, '%':0, 'Total':58.20, 'Línea':16 },
+    { 'Referencia':'IM-ACRIL-15', 'Designación':'Imprimación acrílica al agua, garrafa 15 L', 'Cantidad':2, 'Precio €':41.60, '%':10, 'Total':74.88, 'Línea':17 },
+    { 'Referencia':'PI-PLAST-15', 'Designación':'Pintura plástica mate lavable blanca, cubo 15 L', 'Cantidad':3, 'Precio €':54.90, '%':10, 'Total':148.23, 'Línea':18 },
+    { 'Referencia':'RO-ANTIG-22', 'Designación':'Rodillo antigota de 22 cm con mango extensible', 'Cantidad':4, 'Precio €':9.20, '%':0, 'Total':36.80, 'Línea':19 },
+    { 'Referencia':'CI-KRAFT-50', 'Designación':'Cinta de carrocero kraft 50 mm, rollo 50 m', 'Cantidad':8, 'Precio €':3.10, '%':0, 'Total':24.80, 'Línea':20 },
+    { 'Referencia':'PL-PROT-04',  'Designación':'Plástico de protección 4x5 m, galga 40', 'Cantidad':6, 'Precio €':5.40, '%':0, 'Total':32.40, 'Línea':21 },
+    { 'Referencia':'FO-LED-18W',  'Designación':'Foco LED empotrable 18 W, luz neutra 4000 K', 'Cantidad':12, 'Precio €':16.75, '%':15, 'Total':170.85, 'Línea':22 },
+    { 'Referencia':'CB-25MM-100', 'Designación':'Cable flexible 2,5 mm², rollo 100 m', 'Cantidad':2, 'Precio €':68.40, '%':0, 'Total':136.80, 'Línea':23 },
+    { 'Referencia':'CJ-EMPAL-10', 'Designación':'Caja de empalme estanca IP55, 100x100 mm', 'Cantidad':9, 'Precio €':4.95, '%':0, 'Total':44.55, 'Línea':24 }
+  ],
+  'Subtotal': 2911.68,
+  'Total': 3523.13
+};
 
-    <div class="totals-wrap">
-      <div class="totals">
-        <div class="totals-row bold">
-          <span>Total sin IVA</span>
-          <span class="num" id="subtotalVal">0,00 €</span>
-        </div>
-        <div class="totals-row">
-          <span>Montante IVA 21</span>
-          <span class="num" id="ivaVal">0,00 €</span>
-        </div>
-        <div class="totals-row final">
-          <span>Total con IVA</span>
-          <span class="num" id="totalVal">0,00 €</span>
-        </div>
-      </div>
-    </div>
+/* ---- Formateadores: espejo de formatMoney_ / formatNumber_ ----
+   Sin símbolo de moneda, tal como quedó en el Sprint 007. */
+function formatMoney(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  if (isNaN(n)) return escapeHtml(String(value));
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
-    </div>
+function formatNumber(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  if (isNaN(n)) return escapeHtml(String(value));
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
-    <div class="bottom-block">
-      <div class="signature-wrap">
-        <div class="signature">Firma:</div>
-      </div>
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-      <div class="legal">
-        <p><strong>Aviso:</strong> los precios indicados son orientativos y están sujetos a disponibilidad en tienda. <strong>Validez:</strong> esta lista de compra no constituye un presupuesto vinculante ni una oferta comercial. <strong>Uso:</strong> documento de uso interno, sin validez como factura ni como justificante de compra. <strong>Recomendación:</strong> confirme precios y stock antes de realizar la compra definitiva.</p>
-        <div class="page-num">Página 1/1</div>
-      </div>
-    </div>
+// Espejo de chunkArray_.
+function chunkArray(arr, size) {
+  if (!arr.length) return [[]];
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
 
-  </div>
+// Espejo de buildBudgetHtml_.
+function buildBudgetHtml(b) {
+  const esc = escapeHtml;
+  const money = formatMoney;
+  const num = formatNumber;
 
-  <script>
-    // Datos ficticios de ejemplo — solo para maquetación visual.
-    const ITEMS = [
-      { ref: 'PC-20120-GR', desc: 'Pavimento porcelánico 20x120 cm, acabado mate gris', note: '', qty: 42,  price: 24.90, disc: 10 },
-      { ref: 'AD-C2-25KG',  desc: 'Adhesivo cementoso C2 flexible, saco 25 kg',           note: '', qty: 6,   price: 18.40, disc: 0  },
-      { ref: 'MR-FLEX-20',  desc: 'Mortero autonivelante flexible, saco 20 kg',           note: '', qty: 4,   price: 21.10, disc: 0  },
-      { ref: 'RD-ALU-260',  desc: 'Rodapié de aluminio anodizado, barra 2,60 m',          note: '', qty: 14,  price: 9.75,  disc: 5  },
-      { ref: 'CU-NIV-100',  desc: 'Cuñas de nivelación, bolsa 100 unidades',              note: '', qty: 3,   price: 6.20,  disc: 0  },
-      { ref: 'CR-NIV-2MM',  desc: 'Crucetas de nivelación 2 mm, bolsa 250 unidades',      note: '', qty: 3,   price: 5.85,  disc: 0  },
-      { ref: 'PF-ALU-270',  desc: 'Perfil de aluminio de remate, barra 2,70 m',           note: 'Pendiente de confirmar acabado', qty: 8, price: 11.30, disc: 8 },
-      { ref: 'JU-GRIS-5KG', desc: 'Junta cementosa gris antimoho, envase 5 kg',           note: '', qty: 2,   price: 14.60, disc: 0  },
-      { ref: 'LM-IMPER-10', desc: 'Lámina impermeabilizante bajo suelo, rollo 10 m²',     note: '', qty: 5,   price: 32.00, disc: 12 },
-      { ref: 'SI-NEU-300',  desc: 'Silicona neutra universal, cartucho 300 ml',           note: '', qty: 10,  price: 4.45,  disc: 0  }
-    ];
+  const docNumber = b['Presupuesto']
+    ? '<div class="doc-number">' + esc(b['Presupuesto']) + '</div>'
+    : '';
+  const docDate = b['Fecha']
+    ? '<div class="doc-date">Fecha: ' + esc(b['Fecha']) + '</div>'
+    : '';
 
-    const IVA_RATE = 0.21;
+  const tiendaLines = [
+    COMPANY.NAME ? '<div class="party-name">' + esc(COMPANY.NAME) + '</div>' : '',
+    COMPANY.ADDRESS_LINE_1 ? '<div class="party-line">' + esc(COMPANY.ADDRESS_LINE_1) + '</div>' : '',
+    COMPANY.ADDRESS_LINE_2 ? '<div class="party-line">' + esc(COMPANY.ADDRESS_LINE_2) + '</div>' : '',
+    COMPANY.PHONE ? '<div class="party-line">Tel.: ' + esc(COMPANY.PHONE) + '</div>' : ''
+  ].filter(Boolean).join('');
 
-    function euro(n) {
-      return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
-    }
+  const clienteLines = [
+    b['Cliente'] ? '<div class="party-name upper">' + esc(b['Cliente']) + '</div>' : '',
+    b['Dirección'] ? '<div class="party-line">' + esc(b['Dirección']) + '</div>' : '',
+    b['Teléfono'] ? '<div class="party-line">Teléfono: ' + esc(b['Teléfono']) + '</div>' : '',
+    b['Correo electrónico'] ? '<div class="party-line">Email: ' + esc(b['Correo electrónico']) + '</div>' : ''
+  ].filter(Boolean).join('');
 
-    function numFmt(n) {
-      return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+  const atendidoPor = b['Vendedor']
+    ? 'Ha sido atendido por: <span class="upper">' + esc(b['Vendedor']) + '</span>'
+    : '';
 
-    function render() {
-      const tbody = document.getElementById('itemsBody');
-      let subtotal = 0;
+  const subtotal = b['Subtotal'];
+  const total = b['Total'];
+  const hasIva = subtotal !== null && subtotal !== undefined && subtotal !== '' &&
+    total !== null && total !== undefined && total !== '' &&
+    !isNaN(Number(subtotal)) && !isNaN(Number(total));
+  const ivaAmount = hasIva ? Number(total) - Number(subtotal) : null;
 
-      ITEMS.forEach(function (item) {
-        const lineTotal = item.qty * item.price * (1 - item.disc / 100);
-        subtotal += lineTotal;
+  const pageHeaderHtml = '' +
+    '<div class="page-header">' +
+    '<div class="doc-header">' +
+    '<div class="side"></div>' +
+    '<div class="doc-title-block">' +
+    '<div class="doc-type">LISTA DE COMPRA</div>' +
+    docNumber +
+    docDate +
+    '</div>' +
+    '<div class="side"></div>' +
+    '</div>' +
+    '<div class="parties">' +
+    '<div>' + tiendaLines + '</div>' +
+    '<div>' + clienteLines + '</div>' +
+    '</div>' +
+    '<div class="attended-row">' +
+    '<div class="party-line">' + atendidoPor + '</div>' +
+    '<div></div>' +
+    '</div>' +
+    '<div class="courtesy">' +
+    '<div>GRACIAS POR SU CONFIANZA EN ESTE PROYECTO.</div>' +
+    '<div>DOCUMENTO ELABORADO PARA FACILITAR LA COMPRA DE LOS MATERIALES.</div>' +
+    '</div>' +
+    '</div>';
 
-        const noteHtml = item.note ? '<span class="note">' + item.note + '</span>' : '';
+  const legalFooterHtml = '' +
+    '<div class="legal-footer">' +
+    '<div class="legal">' +
+    '<p><strong>Aviso:</strong> los precios indicados son orientativos y están sujetos a disponibilidad en tienda. ' +
+    '<strong>Validez:</strong> esta lista de compra no constituye un presupuesto vinculante ni una oferta comercial. ' +
+    '<strong>Uso:</strong> documento de uso interno, sin validez como factura ni como justificante de compra. ' +
+    '<strong>Recomendación:</strong> confirme precios y stock antes de realizar la compra definitiva.</p>' +
+    '</div>' +
+    '</div>';
 
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td class="desc">' + item.desc + noteHtml + '</td>' +
-          '<td>' + item.ref + '</td>' +
-          '<td class="num">' + numFmt(item.qty) + '</td>' +
-          '<td class="num">' + numFmt(item.disc) + '</td>' +
-          '<td class="num">' + euro(item.price) + '</td>' +
-          '<td class="num">' + euro(lineTotal) + '</td>';
-        tbody.appendChild(tr);
-      });
+  const items = Array.isArray(b['Líneas del presupuesto']) ? b['Líneas del presupuesto'] : [];
+  const pages = chunkArray(items, ROWS_PER_PAGE);
 
-      const iva = subtotal * IVA_RATE;
-      const total = subtotal + iva;
+  const colgroupHtml = '<colgroup><col class="desc"><col class="ref"><col class="qty"><col class="disc"><col class="price"><col class="total"></colgroup>';
+  const theadHtml = '<thead><tr>' +
+    '<th>Designación</th><th>Referencia</th><th>Ctd</th><th>Tipo IVA</th><th>Precio Unitario</th><th>Importe con IVA</th>' +
+    '</tr></thead>';
 
-      document.getElementById('subtotalVal').textContent = euro(subtotal);
-      document.getElementById('ivaVal').textContent = euro(iva);
-      document.getElementById('totalVal').textContent = euro(total);
-    }
+  const totalsHtml = '' +
+    '<div class="totals-signature">' +
+    '<div class="totals-wrap">' +
+    '<div class="totals">' +
+    '<div class="totals-row bold"><span>Total sin IVA</span><span class="num">' + money(subtotal) + '</span></div>' +
+    '<div class="totals-row"><span>Montante IVA 21</span><span class="num">' + (hasIva ? money(ivaAmount) : '') + '</span></div>' +
+    '<div class="totals-row final"><span>Total con IVA</span><span class="num">' + money(total) + '</span></div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="signature-wrap"><div class="signature">Firma:</div></div>' +
+    '</div>';
 
-    render();
-  </script>
+  const lastIndex = pages.length - 1;
+
+  const pagesHtml = pages.map(function (pageItems, pageIndex) {
+    const rows = pageItems.map(function (item) {
+      return '<tr>' +
+        '<td class="desc">' + esc(item['Designación'] || '') + '</td>' +
+        '<td>' + esc(item['Referencia'] || '') + '</td>' +
+        '<td class="num">' + num(item['Cantidad']) + '</td>' +
+        '<td class="num">' + num(item['%']) + '</td>' +
+        '<td class="num">' + money(item['Precio €']) + '</td>' +
+        '<td class="num">' + money(item['Total']) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    const breakClass = pageIndex === 0 ? '' : ' page-break';
+    const extras = (pageIndex === lastIndex) ? totalsHtml : '';
+
+    return '<div class="content' + breakClass + '">' +
+      '<table class="items">' + colgroupHtml + theadHtml + '<tbody>' + rows + '</tbody></table>' +
+      extras +
+      '</div>';
+  }).join('');
+
+  return pageHeaderHtml + legalFooterHtml + pagesHtml;
+}
+
+document.getElementById('page').innerHTML = buildBudgetHtml(BUDGET);
+</script>
 
 </body>
 </html>
