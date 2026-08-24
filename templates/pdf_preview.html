@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Lista de compra — OP-000001</title>
+<style>
+
+  /* ============================================================
+     TOKENS
+     Documento clásico de trabajo: blanco y negro, sin acentos de
+     color. La distribución en bloques replica deliberadamente la
+     del presupuesto oficial (misma retícula, mismos tamaños
+     relativos, misma tabla con rejilla completa); el contenido de
+     cada bloque es el que marca la diferencia.
+  ============================================================ */
+  :root {
+    --ink: #000000;
+    --ink-soft: #333333;
+    --ink-muted: #6a6a6a;
+    --line: #000000;
+    --line-soft: #999999;
+    --head-bg: #dcdcdc;
+
+    --font: Arial, Helvetica, 'Liberation Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: #e9e9e7; }
+
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--ink);
+  }
+
+  /* ============================================================
+     BARRA DE HERRAMIENTAS (solo pantalla)
+  ============================================================ */
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    padding: 14px 0;
+    background: #e9e9e7;
+    border-bottom: 1px solid #d3d3d0;
+  }
+
+  .toolbar button {
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: #222;
+    border: none;
+    border-radius: 4px;
+    padding: 11px 20px;
+    cursor: pointer;
+  }
+
+  .toolbar button:hover { background: #000; }
+
+  /* ============================================================
+     LIENZO / PÁGINA (A4)
+  ============================================================ */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 28px auto 60px;
+    background: #ffffff;
+    box-shadow: 0 0 0 1px #d3d3d0, 0 8px 24px rgba(0,0,0,0.08);
+    padding: 14mm 16mm 12mm;
+    font-size: 11px;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .content { flex: 1 0 auto; }
+
+  /* Bloque firma + pie: siempre pegado al final de la página. En este
+     boceto de una sola página basta con empujarlo con margin-top:auto.
+     LIMITACIÓN DE APPS SCRIPT: cuando el documento ocupe varias páginas,
+     "anclar al fondo de cada página" y "firma solo en la última página"
+     requieren paginación real (CSS Paged Media / running elements), que
+     no está soportada de forma fiable por el motor de conversión HTML→PDF
+     de Apps Script (Utilities.getAs). Habrá que resolverlo en la fase de
+     integración, probablemente calculando manualmente los saltos de
+     página; no se puede dar por hecho que funcione igual que aquí. */
+  .bottom-block { margin-top: auto; }
+
+  /* ============================================================
+     CABECERA
+     Retícula de 3 columnas idéntica en proporción a la del
+     documento oficial (zona izquierda / bloque de título central /
+     zona derecha). Se eliminan logo y código de barras: las zonas
+     laterales quedan vacías en vez de ocupadas por elementos de
+     marca, conservando el ritmo y el equilibrio del original.
+  ============================================================ */
+  .doc-header {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    align-items: start;
+    margin-bottom: 14px;
+  }
+
+  .doc-header .side { min-height: 1px; }
+
+  .doc-title-block {
+    text-align: center;
+  }
+
+  .doc-title-block .doc-type {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .doc-title-block .doc-number {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 3px;
+  }
+
+  .doc-title-block .doc-date {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-top: 3px;
+  }
+
+  /* ============================================================
+     BLOQUE DE PARTES (empresa / cliente + atendido por)
+     Misma retícula de dos columnas que el original, con la misma
+     secuencia: nombre en negrita, líneas de dirección, línea en
+     blanco, teléfono; fila siguiente con "atendido por" a la
+     izquierda. La columna derecha de esa fila (antes "Nº cliente")
+     se deja vacía: ese dato no existe en Oportunity.
+  ============================================================ */
+  .parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 140px;
+    margin-bottom: 10px;
+  }
+
+  .upper { text-transform: uppercase; }
+
+  .party-name { font-size: 13px; font-weight: 700; }
+
+  .party-line { color: var(--ink-soft); margin-top: 2px; }
+
+  .party-spacer { height: 11px; }
+
+  .attended-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 60px;
+    margin-bottom: 18px;
+  }
+
+  /* ============================================================
+     MENSAJE DE CORTESÍA
+     Dos líneas centradas en mayúsculas y negrita, igual que en el
+     original ("LEROY MERLIN te agradece tu confianza." /
+     "PRESUPUESTO ENTREGADO..."), sustituidas por un mensaje neutro
+     que no menciona la marca ni la palabra "presupuesto".
+  ============================================================ */
+  .courtesy {
+    text-align: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    margin-bottom: 20px;
+  }
+
+  .courtesy div + div { margin-top: 2px; }
+
+  /* ============================================================
+     TABLA
+     Rejilla completa (bordes en todas las celdas) y cabecera
+     sombreada en gris claro, igual que el documento oficial. Se
+     elimina la columna "Tipo IVA" (dato fiscal sin sentido aquí)
+     y se sustituye por "%" de descuento por línea; se elimina el
+     doble código EAN/Ref, dejando una única referencia.
+  ============================================================ */
+  table.items {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 16px;
+  }
+
+  table.items col.desc  { width: 39%; }
+  table.items col.ref   { width: 13%; }
+  table.items col.qty   { width: 8%;  }
+  table.items col.disc  { width: 10%; }
+  table.items col.price { width: 13%; }
+  table.items col.total { width: 17%; }
+
+  table.items th,
+  table.items td {
+    border: 1px solid var(--line);
+    padding: 5px 6px;
+    vertical-align: top;
+    text-align: center;
+  }
+
+  table.items thead th {
+    background: var(--head-bg);
+    font-size: 9px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  table.items td.desc { text-align: left; text-transform: uppercase; }
+
+  table.items tbody td { font-size: 10.5px; overflow-wrap: break-word; }
+
+  table.items td.num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  table.items .note {
+    display: block;
+    font-size: 9px;
+    font-style: italic;
+    font-weight: 400;
+    text-transform: none;
+    color: var(--ink-muted);
+    margin-top: 1px;
+  }
+
+  /* ============================================================
+     TOTALES
+     Bloque simple alineado a la derecha, sin filetes decorativos,
+     igual que el original: dos líneas normales y una tercera en
+     negrita de mayor tamaño para el total final.
+  ============================================================ */
+  .totals-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 30px;
+  }
+
+  .totals { width: 72mm; }
+
+  .totals-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+  }
+
+  .totals-row.bold { font-weight: 700; }
+
+  .totals-row.final {
+    font-weight: 700;
+    font-size: 13px;
+    margin-top: 5px;
+  }
+
+  .totals-row.final .num {
+    display: inline-block;
+    border-top: 1px solid var(--line);
+    padding-top: 4px;
+  }
+
+  /* ============================================================
+     FIRMA
+  ============================================================ */
+  .signature-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 22px;
+  }
+
+  .signature {
+    width: 62mm;
+    border: 1px solid var(--line);
+    padding: 30px 10px 8px;
+    font-size: 10.5px;
+  }
+
+  /* ============================================================
+     PIE
+     Sustituye el bloque legal RGPD del original (tratamiento de
+     datos, legitimación, derechos ARCO...) por un bloque de avisos
+     propios de una lista de compra, con el mismo peso visual:
+     letra pequeña, gris, varias líneas, sin protagonismo pero
+     presente — es lo que da al documento su aspecto profesional.
+  ============================================================ */
+  .legal {
+    border-top: 1px solid var(--line-soft);
+    padding-top: 7px;
+    font-size: 8px;
+    color: var(--ink-muted);
+    line-height: 1.55;
+    text-align: justify;
+  }
+
+  .legal p { margin: 0 0 6px; }
+
+  .legal strong {
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+
+  .legal .page-num {
+    text-align: center;
+  }
+
+  /* ============================================================
+     IMPRESIÓN
+  ============================================================ */
+  @media print {
+    html, body { background: #ffffff; }
+    .toolbar { display: none; }
+    .page {
+      width: auto;
+      min-height: calc(297mm - 28mm);
+      margin: 0;
+      padding: 0;
+      box-shadow: none;
+    }
+    @page {
+      size: A4;
+      margin: 14mm 15mm;
+    }
+    table.items tbody tr,
+    .totals-wrap, .signature { break-inside: avoid; }
+  }
+
+</style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <button onclick="window.print()">📄 Imprimir / Guardar como PDF</button>
+  </div>
+
+  <div class="page">
+
+    <div class="content">
+
+    <div class="doc-header">
+      <div class="side"></div>
+      <div class="doc-title-block">
+        <div class="doc-type">LISTA DE COMPRA</div>
+        <div class="doc-number">OP-000001</div>
+        <div class="doc-date">Fecha: 19/07/2026</div>
+      </div>
+      <div class="side"></div>
+    </div>
+
+    <div class="parties">
+      <div>
+        <div class="party-name">Leroy Merlin Valladolid</div>
+        <div class="party-line">Avda. de Salamanca, 24</div>
+        <div class="party-line">47008 Valladolid</div>
+        <div class="party-spacer"></div>
+        <div class="party-line">Tel. tienda: 983 210 400</div>
+      </div>
+      <div>
+        <div class="party-name upper">Juan Pérez García</div>
+        <div class="party-line">Teléfono: 612 345 678</div>
+      </div>
+    </div>
+
+    <div class="attended-row">
+      <div class="party-line">Ha sido atendido por: <span class="upper">Carlos Sánchez</span></div>
+      <div></div>
+    </div>
+
+    <div class="courtesy">
+      <div>GRACIAS POR SU CONFIANZA EN ESTE PROYECTO.</div>
+      <div>DOCUMENTO ELABORADO PARA FACILITAR LA COMPRA DE LOS MATERIALES.</div>
+    </div>
+
+    <table class="items">
+      <colgroup>
+        <col class="desc"><col class="ref"><col class="qty">
+        <col class="disc"><col class="price"><col class="total">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Designación</th>
+          <th>Referencia</th>
+          <th>Ctd</th>
+          <th>Tipo IVA</th>
+          <th>Precio Unitario €</th>
+          <th>Importe con IVA</th>
+        </tr>
+      </thead>
+      <tbody id="itemsBody"></tbody>
+    </table>
+
+    <div class="totals-wrap">
+      <div class="totals">
+        <div class="totals-row bold">
+          <span>Total sin IVA</span>
+          <span class="num" id="subtotalVal">0,00 €</span>
+        </div>
+        <div class="totals-row">
+          <span>Montante IVA 21</span>
+          <span class="num" id="ivaVal">0,00 €</span>
+        </div>
+        <div class="totals-row final">
+          <span>Total con IVA</span>
+          <span class="num" id="totalVal">0,00 €</span>
+        </div>
+      </div>
+    </div>
+
+    </div>
+
+    <div class="bottom-block">
+      <div class="signature-wrap">
+        <div class="signature">Firma:</div>
+      </div>
+
+      <div class="legal">
+        <p><strong>Aviso:</strong> los precios indicados son orientativos y están sujetos a disponibilidad en tienda. <strong>Validez:</strong> esta lista de compra no constituye un presupuesto vinculante ni una oferta comercial. <strong>Uso:</strong> documento de uso interno, sin validez como factura ni como justificante de compra. <strong>Recomendación:</strong> confirme precios y stock antes de realizar la compra definitiva.</p>
+        <div class="page-num">Página 1/1</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Datos ficticios de ejemplo — solo para maquetación visual.
+    const ITEMS = [
+      { ref: 'PC-20120-GR', desc: 'Pavimento porcelánico 20x120 cm, acabado mate gris', note: '', qty: 42,  price: 24.90, disc: 10 },
+      { ref: 'AD-C2-25KG',  desc: 'Adhesivo cementoso C2 flexible, saco 25 kg',           note: '', qty: 6,   price: 18.40, disc: 0  },
+      { ref: 'MR-FLEX-20',  desc: 'Mortero autonivelante flexible, saco 20 kg',           note: '', qty: 4,   price: 21.10, disc: 0  },
+      { ref: 'RD-ALU-260',  desc: 'Rodapié de aluminio anodizado, barra 2,60 m',          note: '', qty: 14,  price: 9.75,  disc: 5  },
+      { ref: 'CU-NIV-100',  desc: 'Cuñas de nivelación, bolsa 100 unidades',              note: '', qty: 3,   price: 6.20,  disc: 0  },
+      { ref: 'CR-NIV-2MM',  desc: 'Crucetas de nivelación 2 mm, bolsa 250 unidades',      note: '', qty: 3,   price: 5.85,  disc: 0  },
+      { ref: 'PF-ALU-270',  desc: 'Perfil de aluminio de remate, barra 2,70 m',           note: 'Pendiente de confirmar acabado', qty: 8, price: 11.30, disc: 8 },
+      { ref: 'JU-GRIS-5KG', desc: 'Junta cementosa gris antimoho, envase 5 kg',           note: '', qty: 2,   price: 14.60, disc: 0  },
+      { ref: 'LM-IMPER-10', desc: 'Lámina impermeabilizante bajo suelo, rollo 10 m²',     note: '', qty: 5,   price: 32.00, disc: 12 },
+      { ref: 'SI-NEU-300',  desc: 'Silicona neutra universal, cartucho 300 ml',           note: '', qty: 10,  price: 4.45,  disc: 0  }
+    ];
+
+    const IVA_RATE = 0.21;
+
+    function euro(n) {
+      return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    }
+
+    function numFmt(n) {
+      return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render() {
+      const tbody = document.getElementById('itemsBody');
+      let subtotal = 0;
+
+      ITEMS.forEach(function (item) {
+        const lineTotal = item.qty * item.price * (1 - item.disc / 100);
+        subtotal += lineTotal;
+
+        const noteHtml = item.note ? '<span class="note">' + item.note + '</span>' : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="desc">' + item.desc + noteHtml + '</td>' +
+          '<td>' + item.ref + '</td>' +
+          '<td class="num">' + numFmt(item.qty) + '</td>' +
+          '<td class="num">' + numFmt(item.disc) + '</td>' +
+          '<td class="num">' + euro(item.price) + '</td>' +
+          '<td class="num">' + euro(lineTotal) + '</td>';
+        tbody.appendChild(tr);
+      });
+
+      const iva = subtotal * IVA_RATE;
+      const total = subtotal + iva;
+
+      document.getElementById('subtotalVal').textContent = euro(subtotal);
+      document.getElementById('ivaVal').textContent = euro(iva);
+      document.getElementById('totalVal').textContent = euro(total);
+    }
+
+    render();
+  </script>
+
+</body>
+</html>
