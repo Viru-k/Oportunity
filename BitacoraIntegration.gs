@@ -12,6 +12,24 @@
  *    llega por doPost (ver mas abajo) y se resuelve reutilizando
  *    obtenerOportunidadPorUuid + generarPdfPresupuesto, sin volver a
  *    guardar nada.
+ *
+ * Reparto de propiedad de los datos (importante):
+ * Oportunity NO es dueno de toda la fila de Bitacora. Solo posee los datos
+ * que salen del propio presupuesto (numero OP, cliente, telefono, importe
+ * y fecha). Todo lo demas -estado, notas, seguimientos, mediciones,
+ * instalaciones, asesor asignado, color- pertenece al flujo de trabajo de
+ * Bitacora y lo edita gente alli.
+ *
+ * Por eso, al ACTUALIZAR una fila que ya existe, solo se reescriben las
+ * columnas de CAMPOS_PROPIOS_ y el resto se conserva tal cual estaba. Al
+ * CREAR una fila nueva si se escriben todas, con sus valores iniciales.
+ *
+ * Antes no era asi: la actualizacion volcaba la fila entera con valores
+ * fijos, de modo que un presupuesto que ya iba por 'medicion hecha', con
+ * notas y fecha de instalacion, volvia a 'nuevopixis' en blanco en cuanto
+ * alguien lo reabria en Oportunity y pulsaba Guardar cambios o Generar
+ * PDF. Si anades campos nuevos que Oportunity deba mandar, agregalos a
+ * CAMPOS_PROPIOS_; si no, no se tocaran al actualizar.
  */
 
 // ID de la hoja de calculo de Bitacora (pestaña 'Datos'). Como este script
@@ -20,6 +38,13 @@
 // evitando los problemas de autenticacion entre proyectos distintos.
 const BITACORA_SPREADSHEET_ID_ = '1FEgYinCoy4SsRsF3G5J_Cbo5qvPvr7h5C8HQwMhKQ_k';
 const BITACORA_SHEET_NAME_ = 'Datos';
+
+/**
+ * Columnas de Bitacora que Oportunity posee y por tanto puede sobrescribir
+ * cuando actualiza una fila existente. Cualquier columna que no este en
+ * esta lista se conserva con el valor que ya tuviera en Bitacora.
+ */
+const CAMPOS_PROPIOS_ = ['num', 'nombre', 'telefono', 'importe', 'fechaPres', 'lastModified', 'oppUuid'];
 
 /**
  * Envia una copia de la oportunidad guardada a Bitacora, escribiendo
@@ -101,14 +126,25 @@ function enviarABitacora_(budget, uuid) {
       oppUuid: uuid
     };
 
-    const rowValues = headers.map(function(h) {
+    const valorDe = function (h) {
       const val = rowObj[h];
       return (val === undefined || val === null) ? '' : val;
-    });
+    };
 
     if (targetRow === -1) {
-      sheet.appendRow(rowValues);
+      // Alta: la fila no existe todavia, se escribe entera con sus valores
+      // iniciales (status 'nuevopixis', seguimiento vacio, etc.).
+      sheet.appendRow(headers.map(valorDe));
     } else {
+      // Actualizacion: se parte de la fila tal como esta en Bitacora y solo
+      // se pisan las columnas que Oportunity posee. Asi el seguimiento que
+      // haya hecho el equipo en Bitacora sobrevive a cualquier reedicion
+      // del presupuesto aqui.
+      const existente = values[targetRow - 1];
+      const rowValues = headers.map(function (h, i) {
+        if (CAMPOS_PROPIOS_.indexOf(h) !== -1) return valorDe(h);
+        return existente[i] === undefined ? '' : existente[i];
+      });
       sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
     }
     debugLog_('Oportunidad volcada en Bitacora', { uuid: uuid, fila: targetRow === -1 ? 'nueva' : targetRow });

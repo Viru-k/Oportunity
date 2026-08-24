@@ -632,7 +632,7 @@
       <button class="back-btn" id="backFromReviewBtn">← Volver al panel</button>
       <div class="panel" id="reviewPanel">
         <h2>Revisar y corregir</h2>
-        <p class="hint">Corrige cualquier dato. "Guardar cambios" guarda el presupuesto tal cual está; "Generar PDF" guarda y además genera el documento.</p>
+        <p class="hint">Corrige cualquier dato. Los importes se recalculan solos: el total de cada línea a partir de cantidad, precio y descuento, y el Subtotal y el Total a partir de las líneas. "Guardar cambios" guarda el presupuesto tal cual está; "Generar PDF" guarda y además genera el documento.</p>
         <div id="reviewFields"></div>
         <button id="saveChangesBtn">Guardar cambios</button>
         <button id="generatePdfBtn">📄 Generar PDF</button>
@@ -821,6 +821,85 @@
     const TECHNICAL_FIELDS = ['Version'];
     const READONLY_FIELDS = ['Presupuesto'];
 
+    /* ====================== RECÁLCULO DE IMPORTES ======================
+       Antes, Subtotal y Total eran campos de texto sueltos: si cambiabas
+       una cantidad o añadías una línea, seguían con el valor anterior, y
+       de ahí salían tanto el importe del PDF como el que se vuelca a
+       Bitácora. Ahora se recalculan solos.
+
+       Dos niveles:
+       - Línea: Cantidad × Precio € × (1 − % / 100). Solo se recalcula al
+         editar una de esas tres columnas; si escribes directamente en
+         Total, se respeta lo que pongas.
+       - Documento: Subtotal = suma de los totales de línea, y
+         Total = Subtotal × (1 + IVA).
+
+       Solo se tocan los campos que ya existan en el presupuesto: si la
+       extracción no trajo Subtotal, no se inventa uno (mismo criterio
+       fail-safe que PresentationMapper.gs).
+    */
+    const IVA_RATE = 0.21;
+    const COLUMNAS_DE_CALCULO = ['Cantidad', 'Precio €', '%'];
+    const COLUMNA_TOTAL_LINEA = 'Total';
+    const CAMPO_SUBTOTAL = 'Subtotal';
+    const CAMPO_TOTAL = 'Total';
+    const TABLA_LINEAS = 'Líneas del presupuesto';
+
+    function aNumero_(v) {
+      if (v === null || v === undefined || v === '') return 0;
+      const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    }
+
+    function redondear2_(n) {
+      return Math.round((n + Number.EPSILON) * 100) / 100;
+    }
+
+    /**
+     * Recalcula el total de una línea y refresca su casilla en pantalla.
+     */
+    function recalcularLinea_(rowObj, inputsPorColumna) {
+      if (!Object.prototype.hasOwnProperty.call(rowObj, COLUMNA_TOTAL_LINEA)) return;
+
+      const cantidad = aNumero_(rowObj['Cantidad']);
+      const precio = aNumero_(rowObj['Precio €']);
+      const descuento = aNumero_(rowObj['%']);
+      const total = redondear2_(cantidad * precio * (1 - descuento / 100));
+
+      rowObj[COLUMNA_TOTAL_LINEA] = total;
+
+      const input = inputsPorColumna[COLUMNA_TOTAL_LINEA];
+      if (input) input.value = total;
+    }
+
+    /**
+     * Recalcula Subtotal y Total del presupuesto a partir de las líneas y
+     * refresca sus casillas en pantalla.
+     */
+    function recalcularTotales_() {
+      if (!currentBudget || !Array.isArray(currentBudget[TABLA_LINEAS])) return;
+
+      const subtotal = redondear2_(currentBudget[TABLA_LINEAS].reduce(function (acc, linea) {
+        return acc + aNumero_(linea && linea[COLUMNA_TOTAL_LINEA]);
+      }, 0));
+
+      if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_SUBTOTAL)) {
+        currentBudget[CAMPO_SUBTOTAL] = subtotal;
+        refrescarCampo_(CAMPO_SUBTOTAL, subtotal);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_TOTAL)) {
+        const total = redondear2_(subtotal * (1 + IVA_RATE));
+        currentBudget[CAMPO_TOTAL] = total;
+        refrescarCampo_(CAMPO_TOTAL, total);
+      }
+    }
+
+    function refrescarCampo_(campo, valor) {
+      const input = reviewFields.querySelector('input[data-field="' + campo + '"]');
+      if (input) input.value = valor;
+    }
+
     function renderReviewForm(budget) {
       reviewFields.innerHTML = '';
 
@@ -859,6 +938,7 @@
       const input = document.createElement('input');
       input.type = 'text';
       input.value = value === null || value === undefined ? '' : value;
+      input.dataset.field = key; // lo usa recalcularTotales_ para refrescarlo
       const wasNumber = typeof value === 'number';
 
       input.addEventListener('input', function () {
@@ -960,6 +1040,7 @@
         columns.forEach(function (col) { newRow[col] = null; });
         currentBudget[key].push(newRow);
         tbody.appendChild(buildTableRow(newRow, columns));
+        recalcularTotales_();
       });
       wrap.appendChild(addBtn);
 
@@ -1003,6 +1084,7 @@
 
     function buildTableRow(rowObj, columns) {
       const tr = document.createElement('tr');
+      const inputsPorColumna = {};
 
       columns.forEach(function (col) {
         const td = document.createElement('td');
@@ -1012,6 +1094,7 @@
         const value = rowObj[col];
         input.value = value === null || value === undefined ? '' : value;
         const wasNumber = typeof value === 'number';
+        inputsPorColumna[col] = input;
 
         input.addEventListener('input', function () {
           const raw = input.value;
@@ -1023,6 +1106,13 @@
           } else {
             rowObj[col] = raw;
           }
+
+          // Editar cantidad, precio o descuento recalcula el total de la
+          // linea; editar el total directamente lo respeta tal cual.
+          if (COLUMNAS_DE_CALCULO.indexOf(col) !== -1) {
+            recalcularLinea_(rowObj, inputsPorColumna);
+          }
+          recalcularTotales_();
         });
 
         td.appendChild(input);
@@ -1040,6 +1130,7 @@
         const idx = currentBudget[key].indexOf(rowObj);
         if (idx !== -1) currentBudget[key].splice(idx, 1);
         tr.remove();
+        recalcularTotales_();
       });
       actionsTd.appendChild(removeBtn);
       tr.appendChild(actionsTd);
