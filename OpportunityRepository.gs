@@ -223,6 +223,37 @@ function buscarOportunidadesPorTexto(query) {
 }
 
 /**
+ * Describe donde esta guardando la aplicacion: fichero, pestaña, cuantas
+ * filas ve y que otras pestañas hay.
+ *
+ * Existe para que la pantalla pueda explicar un listado vacio en lugar de
+ * limitarse a decir que no hay nada. Un listado vacio casi nunca significa
+ * "no hay presupuestos": suele significar "los presupuestos estan en otra
+ * pestaña o en otro fichero", y sin este dato eso es indistinguible.
+ *
+ * @return {{fichero:string, pestana:string, filas:number,
+ *           otrasPestanas:Array<{nombre:string, filas:number}>}}
+ */
+function obtenerInfoAlmacen_() {
+  const sheet = getSheet_();
+  const ss = sheet.getParent();
+
+  const otras = ss.getSheets()
+    .filter(function (s) { return s.getSheetId() !== sheet.getSheetId(); })
+    .map(function (s) {
+      return { nombre: s.getName(), filas: Math.max(0, s.getLastRow() - 1) };
+    })
+    .filter(function (s) { return s.filas > 0; });
+
+  return {
+    fichero: ss.getName(),
+    pestana: sheet.getName(),
+    filas: Math.max(0, sheet.getLastRow() - 1),
+    otrasPestanas: otras
+  };
+}
+
+/**
  * Genera el siguiente número OP mediante un contador en Script Properties
  * protegido con LockService. No depende del contenido de la hoja: sigue
  * siendo correcto con 10 filas o con 50.000, incluso si se borran filas

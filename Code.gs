@@ -87,6 +87,16 @@ function buscarOportunidades(query) {
   return buscarOportunidadesPorTexto(query);
 }
 
+/**
+ * Donde esta guardando la aplicacion. Lo usa la pantalla para explicar un
+ * listado vacio (ver obtenerInfoAlmacen_ en OpportunityRepository.gs).
+ *
+ * @return {{fichero:string, pestana:string, filas:number, otrasPestanas:Array}}
+ */
+function obtenerInfoAlmacen() {
+  return obtenerInfoAlmacen_();
+}
+
 // Marcador temporal de depuracion: si esto NO aparece en pantalla al
 // entrar en "Consultar base de datos", el despliegue activo no tiene este
 // codigo (sigue sirviendo una version anterior).

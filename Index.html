@@ -1318,7 +1318,7 @@
 
       searchStatus.classList.remove('error');
       if (!oportunidades.length) {
-        searchStatus.textContent = 'Todavia no hay presupuestos guardados.';
+        explicarListadoVacio_();
       } else if (!visibles.length) {
         searchStatus.textContent = 'Ninguno de los ' + oportunidades.length +
           ' presupuestos coincide con "' + searchInput.value.trim() + '".';
@@ -1329,6 +1329,38 @@
       } else {
         searchStatus.textContent = visibles.length + ' de ' + oportunidades.length + ' presupuestos';
       }
+    }
+
+    /**
+     * Un listado vacio casi nunca significa "no hay presupuestos": suele
+     * significar "estan en otra pestaña". En vez de dejar al usuario a
+     * ciegas, se le dice donde ha mirado la aplicacion y donde mas hay
+     * datos, para que la diferencia se vea de un vistazo.
+     */
+    function explicarListadoVacio_() {
+      searchStatus.textContent = 'No hay presupuestos guardados.';
+
+      google.script.run
+        .withSuccessHandler(function (info) {
+          if (!info) return;
+
+          let texto = 'No hay presupuestos en la pestaña "' + info.pestana +
+            '" del fichero "' + info.fichero + '".';
+
+          if (info.otrasPestanas && info.otrasPestanas.length) {
+            texto += ' Otras pestañas con datos: ' +
+              info.otrasPestanas.map(function (p) {
+                return '"' + p.nombre + '" (' + p.filas + ')';
+              }).join(', ') + '.';
+          }
+
+          searchStatus.textContent = texto;
+        })
+        .withFailureHandler(function () {
+          // Si ni siquiera se puede consultar donde mira, se deja el
+          // mensaje simple: no merece la pena tapar un error con otro.
+        })
+        .obtenerInfoAlmacen();
     }
 
     // Filtrado instantaneo: como los datos ya estan en memoria, no hace
