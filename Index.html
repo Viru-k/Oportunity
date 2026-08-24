@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//[www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%0A%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%234A8558%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%237EC48A%22/%3E%0A%3C/linearGradient%3E%3C/defs%3E%0A%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22url%28%23g%29%22/%3E%0A%3Cpath%20d%3D%22M34%2010%20L16%2036%20L28%2036%20L24%2054%20L48%2026%20L34%2026%20Z%22%20fill%3D%22%23ffffff%22/%3E%0A%3C/svg%3E](https://www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%0A%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%234A8558%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%237EC48A%22/%3E%0A%3C/linearGradient%3E%3C/defs%3E%0A%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22url%28%23g%29%22/%3E%0A%3Cpath%20d%3D%22M34%2010%20L16%2036%20L28%2036%20L24%2054%20L48%2026%20L34%2026%20Z%22%20fill%3D%22%23ffffff%22/%3E%0A%3C/svg%3E)">
+  <style>
+    :root {
+      --bg: #F0F4F1;
+      --panel: #FFFFFF;
+      --border: #CAD8CC;
+      --text: #1A211A;
+      --muted: #849884;
+      --accent: #4A8558;
+      --accent-hover: #3D6F48;
+      --accent-light: #E6F4E9;
+      --error: #B03030;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .logo-badge {
+      flex-shrink: 0;
+      line-height: 0;
+      filter: drop-shadow(0 2px 5px rgba(74,133,88,.35));
+    }
+
+    .logo-text {
+      text-align: left;
+    }
+
+    header h1 {
+      font-size: 22px;
+      margin: 0;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.2px;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 2px 0 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    #dropZone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      min-height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      cursor: text;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    #dropZone:focus, #dropZone.dragover {
+      border-color: var(--accent);
+    }
+
+    #thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .thumb {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb button {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 20px;
+      height: 20px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    #processBtn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    #processBtn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    #processBtn:disabled {
+      background: #B7CCB9;
+      cursor: not-allowed;
+    }
+
+    #status {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    #status.error {
+      color: var(--error);
+    }
+
+    #resultPanel {
+      display: none;
+    }
+
+    /* ====================== Dashboard y navegación entre vistas ====================== */
+
+    #dashboardChoices {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .dash-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+      gap: 2px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color .15s, background .15s;
+    }
+
+    .dash-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .dash-btn-icon {
+      font-size: 20px;
+    }
+
+    .dash-btn-label {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 4px;
+    }
+
+    .dash-btn-hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .view-screen {
+      display: none;
+    }
+
+    .view-screen.active {
+      display: block;
+    }
+
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 0 14px;
+      font-family: inherit;
+    }
+
+    .back-btn:hover {
+      text-decoration: underline;
+    }
+
+    #resultPanel h2 {
+      font-size: 15px;
+      margin: 0 0 12px;
+    }
+
+    #jsonOutput {
+      width: 100%;
+      min-height: 260px;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fafafa;
+      resize: vertical;
+      white-space: pre;
+    }
+
+    #copyBtn {
+      margin-top: 10px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    #copyBtn:hover {
+      background: #f2f3f5;
+    }
+
+    #reviewPanel {
+      display: none;
+    }
+
+    #reviewPanel h2 {
+      font-size: 15px;
+      margin: 0 0 4px;
+    }
+
+    #reviewPanel p.hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0 0 16px;
+    }
+
+    .field-group {
+      margin-bottom: 14px;
+    }
+
+    .field-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .field-group input,
+    .field-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .field-group textarea {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .table-block {
+      margin-bottom: 18px;
+    }
+
+    .table-block > label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    table.editable-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    table.editable-table th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.editable-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.editable-table input {
+      width: 100%;
+      padding: 5px 6px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 12px;
+    }
+
+    /*
+     * Anchos por columna para "Líneas del presupuesto": layout fijo para que
+     * el resultado sea estable (no dependa del contenido de cada fila), con
+     * el ancho reflejando la importancia de cada dato para una revisión
+     * rápida. Designación es la columna dominante; Referencia/Cantidad/
+     * Precio €/Total son secundarias; %/Línea son de solo consulta rápida.
+     * Se aplica solo a esta tabla mediante [data-key], sin afectar a otras
+     * tablas genéricas que puedan aparecer para campos futuros.
+     */
+    table.editable-table[data-key="Líneas del presupuesto"] {
+      table-layout: fixed;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Referencia"] {
+      width: 12%;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Designación"] {
+      width: 34%;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Cantidad"] {
+      width: 9%;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Precio €"] {
+      width: 12%;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="%"] {
+      width: 6%;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Total"] {
+      width: 12%;
+    }
+
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Línea"] {
+      width: 6%;
+    }
+
+    /* Columna de acciones (✕): siempre la última th/td, sin data-col. */
+    table.editable-table[data-key="Líneas del presupuesto"] th:last-child,
+    table.editable-table[data-key="Líneas del presupuesto"] td:last-child {
+      width: 9%;
+    }
+
+    /* Con table-layout:fixed el texto largo debe poder partirse dentro de
+       la celda en vez de desbordar (relevante sobre todo en Designación). */
+    table.editable-table[data-key="Líneas del presupuesto"] td {
+      overflow-wrap: break-word;
+    }
+
+    .row-remove-btn {
+      border: none;
+      background: none;
+      color: var(--error);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+
+    .add-row-btn {
+      margin-top: 8px;
+      padding: 6px 12px;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .add-row-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    #saveChangesBtn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #saveChangesBtn:hover {
+      background: var(--accent-hover);
+    }
+
+    #generatePdfBtn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #generatePdfBtn:hover:not(:disabled) {
+      background: var(--accent-hover);
+      color: #fff;
+    }
+
+    #generatePdfBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #saveStatus {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    #saveStatus.error {
+      color: var(--error);
+    }
+
+    /* ====================== Sprint 005: persistencia ====================== */
+
+    #searchBox {
+      display: flex;
+      gap: 8px;
+    }
+
+    #searchInput {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    #searchResults {
+      margin-top: 12px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .result-item {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .result-item:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .result-op {
+      font-weight: 700;
+    }
+
+    .result-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .result-right {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .result-total {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 13px;
+    }
+
+    .result-fecha {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    #searchStatus {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    #searchStatus.error {
+      color: var(--error);
+    }
+
+    .readonly-field {
+      background: #f2f3f5 !important;
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-badge">
+        <svg viewBox="0 0 64 64" width="40" height="40">
+          <defs>
+            <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4A8558"/>
+              <stop offset="100%" stop-color="#7EC48A"/>
+            </linearGradient>
+          </defs>
+          <rect width="64" height="64" rx="14" fill="url(#logoGrad)"/>
+          <path d="M34 10 L16 36 L28 36 L24 54 L48 26 L34 26 Z" fill="#ffffff"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <h1>Opportunity</h1>
+        <p>Captura → Revisión → PDF</p>
+      </div>
+    </header>
+
+    <div class="panel" id="dashboardPanel">
+      <h2 style="font-size:15px;margin:0 0 4px;">¿Qué quieres hacer?</h2>
+      <div id="dashboardChoices">
+        <button class="dash-btn" id="goProcessBtn">
+          <span class="dash-btn-icon">🚀</span>
+          <span class="dash-btn-label">Procesar oportunidad</span>
+          <span class="dash-btn-hint">Pega una captura de Pixis y genera el presupuesto</span>
+        </button>
+        <button class="dash-btn" id="goDatabaseBtn">
+          <span class="dash-btn-icon">🔍</span>
+          <span class="dash-btn-label">Consultar base de datos</span>
+          <span class="dash-btn-hint">Busca, revisa y edita presupuestos ya generados</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="view-database" class="view-screen">
+      <button class="back-btn" id="backFromDatabaseBtn">← Volver al panel</button>
+      <div class="panel" id="searchPanel">
+        <h2 style="font-size:15px;margin:0 0 12px;">Base de datos de presupuestos</h2>
+        <div id="searchBox">
+          <input type="text" id="searchInput" placeholder="Buscar por número OP, cliente o teléfono...">
+        </div>
+        <div id="searchResults"></div>
+        <div id="searchStatus"></div>
+      </div>
+    </div>
+
+    <div id="view-process" class="view-screen">
+      <button class="back-btn" id="backFromProcessBtn">← Volver al panel</button>
+      <div class="panel">
+        <div id="dropZone" tabindex="0">
+          <span>Pega aquí una o varias capturas (Ctrl + V)</span>
+          <span style="font-size:12px">o haz clic y pega desde el portapapeles</span>
+        </div>
+        <div id="thumbs"></div>
+        <button id="processBtn" disabled>🚀 Procesar oportunidad</button>
+        <div id="status"></div>
+      </div>
+    </div>
+
+    <div id="view-review" class="view-screen">
+      <button class="back-btn" id="backFromReviewBtn">← Volver al panel</button>
+      <div class="panel" id="reviewPanel">
+        <h2>Revisar y corregir</h2>
+        <p class="hint">Corrige cualquier dato. "Guardar cambios" guarda el presupuesto tal cual está; "Generar PDF" guarda y además genera el documento.</p>
+        <div id="reviewFields"></div>
+        <button id="saveChangesBtn">Guardar cambios</button>
+        <button id="generatePdfBtn">📄 Generar PDF</button>
+        <div id="saveStatus"></div>
+      </div>
+
+      <div class="panel" id="resultPanel">
+        <h2>JSON actualizado</h2>
+        <textarea id="jsonOutput" readonly></textarea>
+        <button id="copyBtn">Copiar JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = { images: [] }; // { data: base64SinPrefijo, mimeType, previewUrl }
+    let currentBudget = null; // objeto en memoria con el presupuesto extraído/editado
+    let currentUuid = null;   // uuid de la oportunidad persistida; null si aún no se ha guardado
+
+    const dropZone = document.getElementById('dropZone');
+    const thumbsEl = document.getElementById('thumbs');
+    const processBtn = document.getElementById('processBtn');
+    const statusEl = document.getElementById('status');
+    const reviewPanel = document.getElementById('reviewPanel');
+    const reviewFields = document.getElementById('reviewFields');
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const generatePdfBtn = document.getElementById('generatePdfBtn');
+    const saveStatusEl = document.getElementById('saveStatus');
+    const resultPanel = document.getElementById('resultPanel');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const copyBtn = document.getElementById('copyBtn');
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    const searchStatus = document.getElementById('searchStatus');
+
+    /* ====================== Navegación: dashboard <-> vistas ====================== */
+
+    const dashboardPanel = document.getElementById('dashboardPanel');
+    const viewDatabase = document.getElementById('view-database');
+    const viewProcess = document.getElementById('view-process');
+    const viewReview = document.getElementById('view-review');
+    const allViews = [viewDatabase, viewProcess, viewReview];
+
+    function showDashboard() {
+      dashboardPanel.style.display = 'block';
+      allViews.forEach(function (v) { v.classList.remove('active'); });
+    }
+
+    function showView(view) {
+      dashboardPanel.style.display = 'none';
+      allViews.forEach(function (v) { v.classList.toggle('active', v === view); });
+    }
+
+    document.getElementById('goProcessBtn').addEventListener('click', function () { showView(viewProcess); });
+    document.getElementById('goDatabaseBtn').addEventListener('click', function () {
+      showView(viewDatabase);
+      runSearch();
+    });
+    document.getElementById('backFromDatabaseBtn').addEventListener('click', showDashboard);
+    document.getElementById('backFromProcessBtn').addEventListener('click', showDashboard);
+    document.getElementById('backFromReviewBtn').addEventListener('click', showDashboard);
+
+    dropZone.addEventListener('paste', function (e) {
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          addImage(file);
+        }
+      }
+    });
+
+    dropZone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function () {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type.indexOf('image') !== -1) {
+          addImage(files[i]);
+        }
+      }
+    });
+
+    function addImage(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const result = e.target.result; // data:image/png;base64,XXXX
+        const base64 = result.split(',')[1];
+        state.images.push({
+          data: base64,
+          mimeType: file.type,
+          previewUrl: result
+        });
+        renderThumbs();
+        updateProcessButton();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderThumbs() {
+      thumbsEl.innerHTML = '';
+      state.images.forEach(function (img, index) {
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb';
+
+        const imgEl = document.createElement('img');
+        imgEl.src = img.previewUrl;
+        thumb.appendChild(imgEl);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '✕';
+        removeBtn.onclick = function () {
+          state.images.splice(index, 1);
+          renderThumbs();
+          updateProcessButton();
+        };
+        thumb.appendChild(removeBtn);
+
+        thumbsEl.appendChild(thumb);
+      });
+    }
+
+    function updateProcessButton() {
+      processBtn.disabled = state.images.length === 0;
+    }
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', !!isError);
+    }
+
+    processBtn.addEventListener('click', function () {
+      processBtn.disabled = true;
+      resultPanel.style.display = 'none';
+      setStatus('Analizando presupuesto...', false);
+
+      const payload = state.images.map(function (img) {
+        return { data: img.data, mimeType: img.mimeType };
+      });
+
+      google.script.run
+        .withSuccessHandler(function (json) {
+          setStatus('Presupuesto analizado correctamente.', false);
+          currentBudget = json;
+          currentUuid = null; // extracción nueva: no está vinculada a ninguna fila todavía
+          renderReviewForm(currentBudget);
+          showView(viewReview);
+          reviewPanel.style.display = 'block';
+          jsonOutput.value = JSON.stringify(currentBudget, null, 2);
+          resultPanel.style.display = 'block';
+          processBtn.disabled = state.images.length === 0;
+        })
+        .withFailureHandler(function (err) {
+          setStatus('No se ha podido interpretar correctamente la captura.', true);
+          processBtn.disabled = state.images.length === 0;
+        })
+        .procesarOportunidad(payload);
+    });
+
+    /* ====================== FORMULARIO EDITABLE (genérico) ======================
+       No asume el esquema definitivo del presupuesto: recorre las claves del
+       objeto recibido y decide el tipo de campo según el tipo de valor.
+       - Escalar (string/number/boolean/null) -> input de texto ligado a la clave.
+       - Array de objetos (p.ej. "items")     -> tabla editable (añadir/eliminar línea).
+       - Cualquier otra cosa (array de primitivos, objeto anidado) -> textarea
+         con el fragmento en JSON, reparseado al guardar.
+
+       Sprint 005: dos excepciones puntuales a este recorrido genérico:
+       - TECHNICAL_FIELDS: metadatos de almacenamiento (p.ej. "Version"), no
+         son datos de negocio y nunca se muestran en el formulario.
+       - READONLY_FIELDS: se muestran como información, pero no son editables
+         por el usuario. "Presupuesto" (OP) lo asigna siempre el backend
+         (OpportunityRepository.gs); permitir su edición aquí rompería la
+         trazabilidad de la persistencia.
+    */
+    const TECHNICAL_FIELDS = ['Version'];
+    const READONLY_FIELDS = ['Presupuesto'];
+
+    function renderReviewForm(budget) {
+      reviewFields.innerHTML = '';
+
+      Object.keys(budget).forEach(function (key) {
+        if (TECHNICAL_FIELDS.indexOf(key) !== -1) return;
+
+        const value = budget[key];
+
+        if (READONLY_FIELDS.indexOf(key) !== -1) {
+          reviewFields.appendChild(buildReadonlyField(key, value));
+        } else if (Array.isArray(value) && value.length > 0 && value.every(isPlainObject)) {
+          reviewFields.appendChild(buildTableBlock(key, value));
+        } else if (Array.isArray(value) && value.length === 0) {
+          // Array vacío: se trata como tabla editable sin filas todavía.
+          reviewFields.appendChild(buildTableBlock(key, value));
+        } else if (isPlainObject(value) || (Array.isArray(value) && !value.every(isPlainObject))) {
+          reviewFields.appendChild(buildRawJsonField(key, value));
+        } else {
+          reviewFields.appendChild(buildScalarField(key, value));
+        }
+      });
+    }
+
+    function isPlainObject(v) {
+      return v !== null && typeof v === 'object' && !Array.isArray(v);
+    }
+
+    function buildScalarField(key, value) {
+      const wrap = document.createElement('div');
+      wrap.className = 'field-group';
+
+      const label = document.createElement('label');
+      label.textContent = key;
+      wrap.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = value === null || value === undefined ? '' : value;
+      const wasNumber = typeof value === 'number';
+
+      input.addEventListener('input', function () {
+        const raw = input.value;
+        if (raw === '') {
+          currentBudget[key] = null;
+        } else if (wasNumber) {
+          const parsed = parseFloat(raw.replace(',', '.'));
+          currentBudget[key] = isNaN(parsed) ? raw : parsed;
+        } else {
+          currentBudget[key] = raw;
+        }
+      });
+
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    /**
+     * Campo de solo lectura (Sprint 005): se muestra como información, pero
+     * el usuario no puede modificarlo. No añade ningún listener que
+     * escriba sobre currentBudget: el valor nunca cambia desde el formulario.
+     */
+    function buildReadonlyField(key, value) {
+      const wrap = document.createElement('div');
+      wrap.className = 'field-group';
+
+      const label = document.createElement('label');
+      label.textContent = key;
+      wrap.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = value === null || value === undefined ? '' : value;
+      input.readOnly = true;
+      input.className = 'readonly-field';
+      wrap.appendChild(input);
+
+      return wrap;
+    }
+
+    function buildRawJsonField(key, value) {
+      const wrap = document.createElement('div');
+      wrap.className = 'field-group';
+
+      const label = document.createElement('label');
+      label.textContent = key + ' (JSON)';
+      wrap.appendChild(label);
+
+      const textarea = document.createElement('textarea');
+      textarea.value = JSON.stringify(value, null, 2);
+      textarea.dataset.key = key;
+      textarea.dataset.rawJson = 'true';
+      wrap.appendChild(textarea);
+
+      return wrap;
+    }
+
+    function buildTableBlock(key, items) {
+      const wrap = document.createElement('div');
+      wrap.className = 'table-block';
+
+      const label = document.createElement('label');
+      label.textContent = key;
+      wrap.appendChild(label);
+
+      // Columnas = orden canónico conocido si existe, o unión de aparición.
+      const columns = collectColumns(items, key);
+
+      const table = document.createElement('table');
+      table.className = 'editable-table';
+      table.dataset.key = key;
+
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      columns.forEach(function (col) {
+        const th = document.createElement('th');
+        th.textContent = col;
+        th.dataset.col = col;
+        headRow.appendChild(th);
+      });
+      headRow.appendChild(document.createElement('th')); // columna de acciones
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      items.forEach(function (rowObj) {
+        tbody.appendChild(buildTableRow(rowObj, columns));
+      });
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'add-row-btn';
+      addBtn.textContent = '+ Añadir línea';
+      addBtn.addEventListener('click', function () {
+        const newRow = {};
+        columns.forEach(function (col) { newRow[col] = null; });
+        currentBudget[key].push(newRow);
+        tbody.appendChild(buildTableRow(newRow, columns));
+      });
+      wrap.appendChild(addBtn);
+
+      return wrap;
+    }
+
+    /**
+     * Orden canónico conocido para tablas cuyo esquema ya está fijado en el
+     * backend (ver ITEM_FIELD_ORDER_ en PresentationMapper.gs). No es una
+     * nueva asunción de esquema: es el mismo orden que el servidor ya
+     * construye explícitamente. Se fija también aquí para no depender del
+     * orden de iteración de claves (Object.keys) de un objeto recibido a
+     * través de google.script.run, que no está garantizado de forma fiable
+     * en el sandbox de Apps Script.
+     *
+     * Cualquier tabla no listada aquí sigue usando el orden de aparición
+     * genérico (comportamiento original del Sprint 002), como red de
+     * seguridad para campos futuros no contemplados todavía.
+     */
+    const KNOWN_COLUMN_ORDER = {
+      'Líneas del presupuesto': ['Referencia', 'Designación', 'Cantidad', 'Precio €', '%', 'Total', 'Línea']
+    };
+
+    function collectColumns(items, tableKey) {
+      const union = [];
+      items.forEach(function (item) {
+        Object.keys(item).forEach(function (k) {
+          if (union.indexOf(k) === -1) union.push(k);
+        });
+      });
+
+      const known = KNOWN_COLUMN_ORDER[tableKey];
+      if (!known) return union;
+
+      // Reordena según el orden canónico; cualquier clave inesperada que no
+      // esté en la lista conocida se añade al final, nunca se descarta.
+      const ordered = known.filter(function (c) { return union.indexOf(c) !== -1; });
+      union.forEach(function (c) { if (ordered.indexOf(c) === -1) ordered.push(c); });
+      return ordered;
+    }
+
+    function buildTableRow(rowObj, columns) {
+      const tr = document.createElement('tr');
+
+      columns.forEach(function (col) {
+        const td = document.createElement('td');
+        td.dataset.col = col;
+        const input = document.createElement('input');
+        input.type = 'text';
+        const value = rowObj[col];
+        input.value = value === null || value === undefined ? '' : value;
+        const wasNumber = typeof value === 'number';
+
+        input.addEventListener('input', function () {
+          const raw = input.value;
+          if (raw === '') {
+            rowObj[col] = null;
+          } else if (wasNumber) {
+            const parsed = parseFloat(raw.replace(',', '.'));
+            rowObj[col] = isNaN(parsed) ? raw : parsed;
+          } else {
+            rowObj[col] = raw;
+          }
+        });
+
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+
+      const actionsTd = document.createElement('td');
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'row-remove-btn';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', function () {
+        const table = tr.closest('table');
+        const key = table.dataset.key;
+        const idx = currentBudget[key].indexOf(rowObj);
+        if (idx !== -1) currentBudget[key].splice(idx, 1);
+        tr.remove();
+      });
+      actionsTd.appendChild(removeBtn);
+      tr.appendChild(actionsTd);
+
+      return tr;
+    }
+
+    saveChangesBtn.addEventListener('click', function () {
+      if (!currentBudget) return;
+
+      // Los campos "raw JSON" (estructuras no escalares ni tabla) se reparsean
+      // ahora y se vuelcan sobre currentBudget; los escalares y las tablas ya
+      // están sincronizados en cada input.
+      const rawTextareas = reviewFields.querySelectorAll('textarea[data-raw-json="true"]');
+      let hasError = false;
+
+      rawTextareas.forEach(function (textarea) {
+        const key = textarea.dataset.key;
+        try {
+          currentBudget[key] = JSON.parse(textarea.value);
+          textarea.style.borderColor = '';
+        } catch (e) {
+          hasError = true;
+          textarea.style.borderColor = 'var(--error)';
+        }
+      });
+
+      if (hasError) {
+        saveStatusEl.textContent = 'Revisa los campos en JSON marcados en rojo: no son válidos.';
+        saveStatusEl.classList.add('error');
+        return;
+      }
+
+      saveChangesBtn.disabled = true;
+      saveStatusEl.classList.remove('error');
+      saveStatusEl.textContent = 'Guardando cambios...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          currentBudget = result.budget;
+          currentUuid = result.uuid;
+          jsonOutput.value = JSON.stringify(currentBudget, null, 2);
+          saveChangesBtn.disabled = false;
+          showDashboard();
+        })
+        .withFailureHandler(function () {
+          saveStatusEl.classList.add('error');
+          saveStatusEl.textContent = 'No se han podido guardar los cambios.';
+          saveChangesBtn.disabled = false;
+        })
+        .guardarOportunidad(currentBudget, currentUuid);
+    });
+
+    /**
+     * Generar PDF ahora persiste la oportunidad antes de construir el
+     * documento (ver generarPdf en Code.gs): así el nº de presupuesto (OP)
+     * queda asignado por el backend y aparece impreso en el PDF, y cada
+     * PDF generado corresponde siempre a una fila guardada en la hoja de
+     * Oportunidades. currentBudget/currentUuid se actualizan con lo que
+     * devuelve el backend (autoridad sobre uuid/OP).
+     */
+    generatePdfBtn.addEventListener('click', function () {
+      if (!currentBudget) return;
+
+      generatePdfBtn.disabled = true;
+      saveStatusEl.classList.remove('error');
+      saveStatusEl.textContent = 'Guardando y generando PDF...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          currentBudget = result.budget;
+          currentUuid = result.uuid;
+          jsonOutput.value = JSON.stringify(currentBudget, null, 2);
+          generatePdfBtn.disabled = false;
+          downloadPdf_(result.base64, result.filename);
+          showDashboard();
+        })
+        .withFailureHandler(function (err) {
+          saveStatusEl.classList.add('error');
+          saveStatusEl.textContent = 'No se ha podido generar el PDF.';
+          generatePdfBtn.disabled = false;
+        })
+        .generarPdf(currentBudget, currentUuid);
+    });
+
+    /**
+     * Descarga directa del PDF en el navegador, sin pasar por Drive:
+     * se construye un enlace temporal a partir del Base64 recibido.
+     */
+    function downloadPdf_(base64, filename) {
+      const link = document.createElement('a');
+      link.href = 'data:application/pdf;base64,' + base64;
+      link.download = filename || 'presupuesto.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    copyBtn.addEventListener('click', function () {
+      jsonOutput.select();
+      document.execCommand('copy');
+      copyBtn.textContent = 'Copiado ✓';
+      setTimeout(function () { copyBtn.textContent = 'Copiar JSON'; }, 1500);
+    });
+
+    dropZone.addEventListener('click', function () {
+      dropZone.focus();
+    });
+
+    /* ====================== Sprint 005: búsqueda y persistencia ====================== */
+
+    let searchDebounceTimer = null;
+
+    function runSearch() {
+      const query = searchInput.value.trim();
+      searchStatus.classList.remove('error');
+      searchStatus.textContent = (query ? 'Buscando...' : 'Cargando presupuestos...') + ' [QUERY: "' + query + '" len=' + query.length + ']';
+
+      google.script.run
+        .withSuccessHandler(function (results) {
+          results = results || [];
+          renderSearchResults(results);
+          google.script.run.withSuccessHandler(function (marker) {
+            searchStatus.textContent = (results.length
+              ? results.length + ' presupuesto(s).'
+              : 'Sin resultados.') + ' [QUERY: "' + query + '" len=' + query.length + '] [DEBUG: ' + JSON.stringify(results).slice(0, 300) + '] [' + marker + ']';
+            google.script.run.withSuccessHandler(function (diag) {
+              searchStatus.textContent += ' [DIAG: ' + JSON.stringify(diag) + ']';
+            })._diagnosticoDesdeWebApp();
+          }).withFailureHandler(function () {
+            searchStatus.textContent = (results.length
+              ? results.length + ' presupuesto(s).'
+              : 'Sin resultados.') + ' [DEBUG: ' + JSON.stringify(results).slice(0, 300) + '] [sin marcador]';
+          })._versionMarker();
+        })
+        .withFailureHandler(function (err) {
+          searchStatus.classList.add('error');
+          searchStatus.textContent = 'No se ha podido completar la búsqueda. [DEBUG ERROR: ' + JSON.stringify(err && err.message ? err.message : err) + ']';
+        })
+        .buscarOportunidades(query);
+    }
+
+    // Buscador inteligente en vivo: filtra mientras se escribe, sin
+    // necesidad de pulsar ningún botón (con un pequeño margen para no
+    // lanzar una búsqueda por cada tecla).
+    searchInput.addEventListener('input', function () {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(runSearch, 250);
+    });
+
+    // La lista se carga al entrar en "Consultar base de datos" (ver
+    // goDatabaseBtn más arriba), no automáticamente al abrir la página.
+
+    function renderSearchResults(results) {
+      searchResults.innerHTML = '';
+      results.forEach(function (r) {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+
+        const left = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'result-op';
+        title.textContent = r.op + ' — ' + (r.cliente || '(sin cliente)');
+        left.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'result-meta';
+        meta.textContent = r.telefono || '';
+        left.appendChild(meta);
+        item.appendChild(left);
+
+        const right = document.createElement('div');
+        right.className = 'result-right';
+        const total = document.createElement('div');
+        total.className = 'result-total';
+        total.textContent = r.total ? formatEuros_(r.total) : '';
+        right.appendChild(total);
+        const fecha = document.createElement('div');
+        fecha.className = 'result-fecha';
+        fecha.textContent = r.fecha || '';
+        right.appendChild(fecha);
+        item.appendChild(right);
+
+        item.addEventListener('click', function () { openOportunidad(r.uuid); });
+        searchResults.appendChild(item);
+      });
+    }
+
+    function formatEuros_(n) {
+      return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    }
+
+    /**
+     * Carga una oportunidad existente en el mismo editor genérico
+     * (renderReviewForm) que ya usa el flujo de extracción por IA.
+     */
+    function openOportunidad(uuid) {
+      searchStatus.classList.remove('error');
+      searchStatus.textContent = 'Cargando oportunidad...';
+
+      google.script.run
+        .withSuccessHandler(function (budget) {
+          if (!budget) {
+            searchStatus.classList.add('error');
+            searchStatus.textContent = 'La oportunidad ya no existe.';
+            return;
+          }
+          currentBudget = budget;
+          currentUuid = uuid;
+          renderReviewForm(currentBudget);
+          showView(viewReview);
+          reviewPanel.style.display = 'block';
+          jsonOutput.value = JSON.stringify(currentBudget, null, 2);
+          resultPanel.style.display = 'block';
+          saveStatusEl.classList.remove('error');
+          saveStatusEl.textContent = 'Oportunidad cargada (' + currentBudget['Presupuesto'] + ').';
+          searchStatus.textContent = '';
+        })
+        .withFailureHandler(function () {
+          searchStatus.classList.add('error');
+          searchStatus.textContent = 'No se ha podido cargar la oportunidad.';
+        })
+        .obtenerOportunidad(uuid);
+    }
+  </script>
+</body>
+</html>
