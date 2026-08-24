@@ -123,14 +123,29 @@ function obtenerOportunidadPorUuid(uuid) {
 }
 
 /**
- * Quita acentos y pasa a minúsculas, para que la búsqueda no dependa de
- * cómo se haya escrito el texto (con o sin tildes, mayúsculas, etc.).
+ * Quita acentos y pasa a minusculas, para que la busqueda no dependa de
+ * como se haya escrito el texto (con o sin tildes, mayusculas, etc.).
+ *
+ * La sustitucion es una tabla explicita, a proposito. Antes esto usaba
+ * String.prototype.normalize('NFD') y un rango de marcas diacriticas
+ * (\u0300-\u036f): mas elegante, pero depende de la implementacion
+ * Unicode del motor y de que ese rango sobreviva intacto a cada copia y
+ * pega entre editor y proyecto, porque son caracteres invisibles. Una
+ * tabla de caracteres es aburrida pero no puede romperse por eso, y esta
+ * ruta decide si el usuario encuentra o no sus presupuestos.
  */
+const ACENTOS_ = 'áàäâãåéèëêíìïîóòöôõúùüûñçÁÀÄÂÃÅÉÈËÊÍÌÏÎÓÒÖÔÕÚÙÜÛÑÇ';
+const SIN_ACENTOS_ = 'aaaaaaeeeeiiiiooooouuuuncAAAAAAEEEEIIIIOOOOOUUUUNC';
+
 function normalizarTexto_(s) {
-  return String(s == null ? '' : s)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  const texto = String(s == null ? '' : s);
+  let salida = '';
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto.charAt(i);
+    const pos = ACENTOS_.indexOf(c);
+    salida += (pos === -1) ? c : SIN_ACENTOS_.charAt(pos);
+  }
+  return salida.toLowerCase();
 }
 
 /**
@@ -159,15 +174,28 @@ function buscarOportunidadesPorTexto(query) {
     const op = String(row[COL_OP_ - 1] || '');
     const cliente = String(row[COL_CLIENTE_ - 1] || '');
     const telefono = String(row[COL_TELEFONO_ - 1] || '');
-    const haystack = normalizarTexto_(op + ' ' + cliente + ' ' + telefono);
+
+    // El JSON se parsea antes de filtrar porque de el salen dos cosas: el
+    // importe que se muestra en el listado y el texto de las lineas, que
+    // permite buscar tambien por producto o referencia sin ninguna lectura
+    // extra de la hoja.
+    let total = 0;
+    let textoLineas = '';
+    try {
+      const guardado = JSON.parse(row[COL_JSON_ - 1]);
+      total = Number(guardado['Total']) || 0;
+      const lineas = guardado['Líneas del presupuesto'];
+      if (Array.isArray(lineas)) {
+        textoLineas = lineas.map(function (l) {
+          return String((l && l['Designación']) || '') + ' ' + String((l && l['Referencia']) || '');
+        }).join(' ');
+      }
+    } catch (e) { /* fila corrupta: se lista igualmente, con total 0 */ }
+
+    const haystack = normalizarTexto_(op + ' ' + cliente + ' ' + telefono + ' ' + textoLineas);
 
     const matches = words.length === 0 || words.every(function (w) { return haystack.indexOf(w) !== -1; });
     if (!matches) return;
-
-    let total = 0;
-    try {
-      total = Number(JSON.parse(row[COL_JSON_ - 1])['Total']) || 0;
-    } catch (e) { /* fila corrupta: se lista igualmente, con total 0 */ }
 
     results.push({
       uuid: row[COL_UUID_ - 1],

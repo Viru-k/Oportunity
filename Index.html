@@ -1269,28 +1269,27 @@
     function runSearch() {
       const query = searchInput.value.trim();
       searchStatus.classList.remove('error');
-      searchStatus.textContent = (query ? 'Buscando...' : 'Cargando presupuestos...') + ' [QUERY: "' + query + '" len=' + query.length + ']';
+      searchStatus.textContent = query ? 'Buscando...' : 'Cargando presupuestos...';
 
       google.script.run
         .withSuccessHandler(function (results) {
           results = results || [];
           renderSearchResults(results);
-          google.script.run.withSuccessHandler(function (marker) {
-            searchStatus.textContent = (results.length
-              ? results.length + ' presupuesto(s).'
-              : 'Sin resultados.') + ' [QUERY: "' + query + '" len=' + query.length + '] [DEBUG: ' + JSON.stringify(results).slice(0, 300) + '] [' + marker + ']';
-            google.script.run.withSuccessHandler(function (diag) {
-              searchStatus.textContent += ' [DIAG: ' + JSON.stringify(diag) + ']';
-            })._diagnosticoDesdeWebApp();
-          }).withFailureHandler(function () {
-            searchStatus.textContent = (results.length
-              ? results.length + ' presupuesto(s).'
-              : 'Sin resultados.') + ' [DEBUG: ' + JSON.stringify(results).slice(0, 300) + '] [sin marcador]';
-          })._versionMarker();
+
+          if (results.length) {
+            searchStatus.textContent = results.length === 1
+              ? '1 presupuesto'
+              : results.length + ' presupuestos';
+          } else if (query) {
+            searchStatus.textContent = 'Ningun presupuesto coincide con "' + query + '".';
+          } else {
+            searchStatus.textContent = 'Todavia no hay presupuestos guardados.';
+          }
         })
         .withFailureHandler(function (err) {
           searchStatus.classList.add('error');
-          searchStatus.textContent = 'No se ha podido completar la búsqueda. [DEBUG ERROR: ' + JSON.stringify(err && err.message ? err.message : err) + ']';
+          searchStatus.textContent = 'No se ha podido completar la busqueda: ' +
+            (err && err.message ? err.message : 'error desconocido');
         })
         .buscarOportunidades(query);
     }
