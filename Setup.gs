@@ -30,7 +30,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Oportunity')
     .addItem('Configurar esta hoja como base de datos', 'configurarHojaDeOportunidades')
-    .addItem('Ver diagnostico', 'mostrarDiagnostico')
+    .addItem('Ver diagnostico', 'diagnostico')
     .addToUi();
 }
 
@@ -72,63 +72,121 @@ function configurarHojaDeOportunidades() {
 }
 
 /**
- * Muestra en un dialogo el mismo diagnostico que la web app enseña en
- * letra pequeña, pero legible y sin tener que rebuscar en la pantalla.
+ * DIAGNOSTICO. Ejecutalo desde el editor de Apps Script: selecciona
+ * "diagnostico" en el desplegable de funciones y pulsa Ejecutar. El
+ * resultado sale en "Registro de ejecucion".
+ *
+ * No necesita desplegar nada. Esa es la gracia: el despliegue es
+ * precisamente una de las cosas que puede estar fallando, asi que un
+ * diagnostico que dependa de el no sirve para descartarlo.
+ *
+ * Responde de una vez a las tres preguntas que importan cuando el listado
+ * sale vacio: que fichero esta usando, que pestañas tiene ese fichero con
+ * cuantas filas cada una, y que devuelve de verdad la busqueda.
  */
-function mostrarDiagnostico() {
-  const ui = SpreadsheetApp.getUi();
+function diagnostico() {
+  const lineas = [];
+  const anota = function (t) { lineas.push(t); };
+
+  anota('===== DIAGNOSTICO DE OPORTUNITY =====');
+  anota('');
+
   const props = PropertiesService.getScriptProperties();
   const idGuardado = props.getProperty('SPREADSHEET_ID');
+  anota('SPREADSHEET_ID en propiedades : ' + (idGuardado || '(sin configurar)'));
+  anota('CONFIG.SHEET_NAME             : "' + CONFIG.SHEET_NAME + '"');
+  anota('OPENROUTER_API_KEY            : ' + (props.getProperty('OPENROUTER_API_KEY') ? 'configurada' : '(sin configurar)'));
 
-  const lineas = [];
-  lineas.push('SPREADSHEET_ID guardado: ' + (idGuardado || '(no configurado)'));
-  lineas.push('OPENROUTER_API_KEY: ' + (props.getProperty('OPENROUTER_API_KEY') ? 'configurada' : '(no configurada)'));
-  lineas.push('');
+  // Hoja a la que esta vinculado el script, si lo esta. Comparar este ID
+  // con el guardado es lo que delata que la aplicacion escribe en un
+  // fichero distinto del que se tiene abierto.
+  let activa = null;
+  try { activa = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { activa = null; }
+  anota('Hoja vinculada al script      : ' + (activa ? activa.getName() + '  (ID ' + activa.getId() + ')' : '(ninguna)'));
 
-  try {
-    const sheet = getSheet_();
-    const ss = sheet.getParent();
-    lineas.push('Hoja de calculo en uso: ' + ss.getName());
-    lineas.push('ID en uso: ' + ss.getId());
-    lineas.push('Pestaña que esta usando: ' + sheet.getName());
-    lineas.push('Filas de datos: ' + Math.max(0, sheet.getLastRow() - 1));
-    lineas.push('Oportunidades que devuelve la busqueda: ' + buscarOportunidadesPorTexto('').length);
-
-    // Todas las pestañas del fichero: si los datos estan en una y la
-    // aplicacion lee de otra, aqui se ve de un vistazo.
-    lineas.push('');
-    lineas.push('Pestañas de este fichero:');
-    ss.getSheets().forEach(function (s) {
-      const filas = Math.max(0, s.getLastRow() - 1);
-      const marca = (s.getSheetId() === sheet.getSheetId()) ? '  <-- en uso' : '';
-      lineas.push('  "' + s.getName() + '"  ' + filas + ' filas' + marca);
-    });
-
-    // Cabeceras: si no coinciden con las esperadas, se leen columnas
-    // equivocadas aunque la pestaña sea la correcta.
-    if (sheet.getLastRow() >= 1 && sheet.getLastColumn() >= 1) {
-      const cabeceras = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const esperadas = SHEET_COLUMNS_.join(' | ');
-      const reales = cabeceras.join(' | ');
-      lineas.push('');
-      lineas.push('Cabeceras esperadas: ' + esperadas);
-      lineas.push('Cabeceras reales   : ' + reales);
-      if (esperadas !== reales) {
-        lineas.push('AVISO: las cabeceras no coinciden. Se estan leyendo');
-        lineas.push('columnas equivocadas aunque la pestaña sea la buena.');
-      }
-    }
-
-    const activa = SpreadsheetApp.getActiveSpreadsheet();
-    if (activa && activa.getId() !== ss.getId()) {
-      lineas.push('');
-      lineas.push('AVISO: esta guardando en una hoja DISTINTA de esta.');
-      lineas.push('Usa "Configurar esta hoja como base de datos" para cambiarlo.');
-    }
-  } catch (e) {
-    lineas.push('ERROR al acceder a la hoja:');
-    lineas.push(String(e && e.message || e));
+  if (activa && idGuardado && activa.getId() !== idGuardado) {
+    anota('');
+    anota('*** ATENCION: la aplicacion NO usa la hoja a la que esta vinculado');
+    anota('*** el script. Escribe en el fichero ' + idGuardado);
   }
 
-  ui.alert('Diagnostico de Oportunity', lineas.join('\n'), ui.ButtonSet.OK);
+  anota('');
+  anota('--- Fichero que esta usando la aplicacion ---');
+
+  let ss;
+  try {
+    ss = SpreadsheetApp.openById(getSpreadsheetId_());
+  } catch (e) {
+    anota('ERROR al abrir la hoja de calculo: ' + String(e && e.message || e));
+    return volcar_(lineas);
+  }
+
+  anota('Nombre : ' + ss.getName());
+  anota('ID     : ' + ss.getId());
+  anota('URL    : ' + ss.getUrl());
+  anota('');
+  anota('--- Pestañas de ese fichero ---');
+  ss.getSheets().forEach(function (h) {
+    const filas = Math.max(0, h.getLastRow() - 1);
+    const usada = (h.getName().trim().toLowerCase() === String(CONFIG.SHEET_NAME).trim().toLowerCase());
+    anota('  "' + h.getName() + '"  ' + filas + ' filas' + (usada ? '   <== la que usa la aplicacion' : ''));
+  });
+
+  anota('');
+  anota('--- Contenido de la pestaña en uso ---');
+  try {
+    const sheet = getSheet_();
+    anota('Pestaña   : "' + sheet.getName() + '"');
+    anota('Ultima fila: ' + sheet.getLastRow() + '  (fila 1 = cabecera)');
+
+    if (sheet.getLastRow() >= 1 && sheet.getLastColumn() >= 1) {
+      anota('Cabeceras esperadas: ' + SHEET_COLUMNS_.join(' | '));
+      anota('Cabeceras reales   : ' + sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].join(' | '));
+    }
+
+    const muestra = Math.min(3, sheet.getLastRow() - 1);
+    if (muestra > 0) {
+      anota('');
+      anota('Primeras ' + muestra + ' filas (UUID / OP / Cliente / Telefono):');
+      sheet.getRange(2, 1, muestra, 4).getValues().forEach(function (f) {
+        anota('  ' + f.join('  |  '));
+      });
+    }
+
+    anota('');
+    anota('--- Lo que devuelve la busqueda ---');
+    const encontrados = buscarOportunidadesPorTexto('');
+    anota('buscarOportunidadesPorTexto("") devuelve: ' + encontrados.length + ' presupuestos');
+    if (encontrados.length) {
+      anota('Primero: ' + encontrados[0].op + '  ' + encontrados[0].cliente);
+      anota('');
+      anota('CONCLUSION: la lectura funciona. Si la pantalla sigue vacia, lo que');
+      anota('esta desactualizado es el DESPLIEGUE de la web app, no el codigo.');
+      anota('Implementar > Gestionar implementaciones > editar > Version: Nueva version.');
+    } else {
+      anota('');
+      anota('CONCLUSION: la pestaña en uso no tiene filas. Mira arriba que pestaña');
+      anota('SI las tiene y ajusta CONFIG.SHEET_NAME, o corrige SPREADSHEET_ID si el');
+      anota('fichero no es el que esperabas.');
+    }
+  } catch (e) {
+    anota('ERROR al leer la pestaña: ' + String(e && e.message || e));
+  }
+
+  return volcar_(lineas);
+}
+
+/**
+ * Escribe el informe en el registro y, si hay interfaz disponible (menu de
+ * la hoja), lo muestra tambien en un dialogo.
+ */
+function volcar_(lineas) {
+  const informe = lineas.join('\n');
+  Logger.log(informe);
+  try {
+    SpreadsheetApp.getUi().alert('Diagnostico de Oportunity', informe, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    // Sin interfaz (ejecutado desde el editor): basta con el registro.
+  }
+  return informe;
 }
