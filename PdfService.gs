@@ -128,6 +128,18 @@
  *   bloque .content (después de la última tabla), no en un bloque
  *   .content aparte. Así fluyen naturalmente tras la última fila.
  *
+ * Sprint 015 (líneas en promoción):
+ * - En la captura, una línea en oferta lleva un icono de cara sonriente
+ *   junto a la cantidad. Hasta ahora el descuento se aplicaba en silencio
+ *   y solo se imprimía el importe neto, de modo que el documento no dejaba
+ *   constancia de que ese precio era promocional.
+ * - El presupuesto oficial lo resuelve con dos filas: la línea a precio
+ *   completo y, debajo, una sublínea "Precio promocional hasta el ..." con
+ *   el descuento en negativo. Se reproduce ese mismo criterio, que además
+ *   es el que permite al cliente ver cuánto se le está descontando.
+ * - Solo cambia la presentación: el Subtotal sigue siendo la suma de los
+ *   importes netos, porque completo menos descuento es el neto de siempre.
+ *
  * Sprint 014 (fin del solapamiento en el folio 2+):
  * - Síntoma: con muchas líneas, el folio 2 arrancaba pegado arriba y la
  *   tabla se metía debajo de la cabecera fija.
@@ -180,6 +192,9 @@ var TABLE_MARGIN_MM_ = 4.5;
 var TOTALS_MM_ = 42;
 
 // Alto de una fila: una base más un incremento por cada línea de texto.
+// Alto de la sublinea de promocion, medido sobre el documento renderizado.
+var PROMO_ROW_MM_ = 6.7;
+
 var ROW_BASE_MM_ = 2.8;
 var ROW_LINE_MM_ = 4.1;
 
@@ -208,7 +223,39 @@ function alturaDisponibleParaFilas_() {
 function alturaEstimadaFila_(item) {
   const desc = String((item && item['Designación']) || '');
   const lineas = Math.max(1, Math.ceil(desc.length / DESC_CHARS_PER_LINE_));
-  return ROW_BASE_MM_ + (lineas * ROW_LINE_MM_);
+  let alto = ROW_BASE_MM_ + (lineas * ROW_LINE_MM_);
+
+  // Una linea en promocion imprime debajo una sublinea propia con el
+  // descuento. Sin contarla, el folio se pasaria de alto.
+  if (esPromocion_(item)) {
+    alto += PROMO_ROW_MM_;
+  }
+
+  return alto;
+}
+
+/**
+ * Una linea esta en promocion si viene marcada como tal y ademas tiene un
+ * descuento que mostrar: sin descuento no hay nada que restar y la
+ * sublinea sobraria.
+ */
+function esPromocion_(item) {
+  if (!item) return false;
+  const marcada = item['Oferta'] === true || String(item['Oferta']).toLowerCase() === 'true';
+  return marcada && descuentoDeLinea_(item) > 0;
+}
+
+/**
+ * Importe descontado en una linea: lo que separa el precio completo del
+ * importe que se cobra.
+ */
+function descuentoDeLinea_(item) {
+  const cantidad = Number(item['Cantidad']) || 0;
+  const precio = Number(item['Precio €']) || 0;
+  const completo = cantidad * precio;
+  const neto = Number(item['Total']);
+  if (isNaN(neto)) return 0;
+  return Math.round((completo - neto) * 100) / 100;
 }
 
 /**
@@ -400,14 +447,37 @@ function buildBudgetHtml_(b) {
 
   const pagesHtml = pages.map(function (pageItems, pageIndex) {
     const rows = pageItems.map(function (item) {
-      return '<tr>' +
+      const promocion = esPromocion_(item);
+
+      // En una linea promocionada, el importe de la fila es el precio
+      // completo: el descuento va aparte, en su propia sublinea.
+      const importe = promocion
+        ? (Number(item['Cantidad']) || 0) * (Number(item['Precio €']) || 0)
+        : item['Total'];
+
+      let html = '<tr>' +
         '<td class="desc">' + esc(item['Designación'] || '') + '</td>' +
         '<td>' + esc(item['Referencia'] || '') + '</td>' +
         '<td class="num">' + num(item['Cantidad']) + '</td>' +
         '<td class="num">' + num(item['%']) + '</td>' +
         '<td class="num">' + money(item['Precio €']) + '</td>' +
-        '<td class="num">' + money(item['Total']) + '</td>' +
+        '<td class="num">' + money(importe) + '</td>' +
         '</tr>';
+
+      if (promocion) {
+        const hasta = String(item['Oferta hasta'] || '').trim();
+        const texto = hasta
+          ? 'Precio promocional hasta el ' + esc(hasta)
+          : 'Precio promocional';
+
+        html += '<tr class="promo">' +
+          '<td class="desc">' + texto + '</td>' +
+          '<td></td><td></td><td></td><td></td>' +
+          '<td class="num">-' + money(descuentoDeLinea_(item)) + '</td>' +
+          '</tr>';
+      }
+
+      return html;
     }).join('');
 
     // page-break-before:always en todos los bloques MENOS el primero
@@ -470,6 +540,11 @@ function buildBudgetHtml_(b) {
     '  table.items td.desc{text-align:left;text-transform:uppercase;}' +
     '  table.items tbody td{font-size:10.5px;overflow-wrap:break-word;}' +
     '  table.items td.num{font-variant-numeric:tabular-nums;}' +
+    // La sublinea de promocion pertenece a la fila de arriba: se le quita
+    // el borde superior y se sangra, para que se lea como una nota de esa
+    // linea y no como un articulo mas.
+    '  table.items tr.promo td{border-top:none;font-size:9.5px;font-style:italic;color:var(--ink-soft);}' +
+    '  table.items tr.promo td.desc{padding-left:16px;text-transform:none;}' +
     '  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:30px;}' +
     '  .totals{width:72mm;}' +
     '  .totals-row{display:flex;justify-content:space-between;padding:2px 0;}' +

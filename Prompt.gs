@@ -15,6 +15,11 @@ const PROMPT = {
     'El iva sale de la resta del total - el subtotal. ' +
     'Si un dato no aparece en las imágenes, devuélvelo como null. ' +
     'Si hay lineas tachadas, ignora esa linea ' +
+    'Si una linea lleva un icono de cara sonriente junto a la cantidad, ' +
+    'su precio es promocional: devuelve "isOffer": true en esa linea. ' +
+    'En el resto de lineas devuelve "isOffer": false. ' +
+    'Si junto a la promocion aparece una fecha de fin, devuelvela en ' +
+    '"offerUntil" con formato dd/mm/aaaa; si no aparece, devuelve null. ' +
     '"tax"" siempre es 21 ' +
     'Si hay varias imágenes, trátalas como un único presupuesto: elimina duplicados, ' +
     'no repitas productos y respeta el orden visual original. ' +
@@ -25,6 +30,7 @@ const PROMPT = {
     '  "customerAddress": null, "budgetDate": null, "seller": null, "store": null, ' +
     '  "subtotal": null, "tax": null, "discount": null, "total": null, ' +
     '  "items": [ { "lineNumber": 1, "reference": null, "description": null, ' +
-    '    "quantity": null, "unitPrice": null, "discountPercent": null, "lineTotal": null } ], ' +
+    '    "quantity": null, "unitPrice": null, "discountPercent": null, "lineTotal": null, ' +
+    '    "isOffer": false, "offerUntil": null } ], ' +
     '  "observations": null, "warnings": [] }'
 };

@@ -52,7 +52,12 @@ const ITEM_FIELD_ORDER_ = [
   { key: 'unitPrice', label: 'Precio €' },
   { key: 'discountPercent', label: '%' },
   { key: 'lineTotal', label: 'Total' },
-  { key: 'lineNumber', label: 'Línea' }
+  { key: 'lineNumber', label: 'Línea' },
+  // Sprint 015: una linea marcada como promocion en la captura (la carita
+  // junto a la cantidad) se imprime en el PDF como el presupuesto oficial:
+  // la linea a precio completo y debajo el descuento en negativo.
+  { key: 'isOffer', label: 'Oferta' },
+  { key: 'offerUntil', label: 'Oferta hasta' }
 ];
 
 /**

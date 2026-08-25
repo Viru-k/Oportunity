@@ -628,13 +628,27 @@
      */
     table.editable-table[data-key="Líneas del presupuesto"] { table-layout: fixed; }
 
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Referencia"] { width: 12%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Designación"] { width: 34%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Cantidad"]    { width: 9%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Precio €"]    { width: 12%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="%"]           { width: 6%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Total"]       { width: 12%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Línea"]       { width: 6%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Referencia"]   { width: 11%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Designación"]  { width: 27%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Cantidad"]     { width: 8%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Precio €"]     { width: 10%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="%"]            { width: 6%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Total"]        { width: 11%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Oferta"]       { width: 7%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Oferta hasta"] { width: 12%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Línea"]        { width: 5%; }
+
+    /* La casilla de oferta se centra en su celda: es un si o un no, no un
+       dato que haya que leer alineado con los importes. */
+    table.editable-table td[data-col="Oferta"] { text-align: center; }
+
+    table.editable-table input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
 
     /* Columna de acciones (eliminar fila): siempre la última th/td, sin data-col. */
     table.editable-table[data-key="Líneas del presupuesto"] th:last-child,
@@ -1118,6 +1132,7 @@
     */
     const IVA_RATE = 0.21;
     const COLUMNAS_DE_CALCULO = ['Cantidad', 'Precio €', '%'];
+    const COLUMNAS_SI_NO = ['Oferta'];
     const COLUMNA_TOTAL_LINEA = 'Total';
     const CAMPO_SUBTOTAL = 'Subtotal';
     const CAMPO_TOTAL = 'Total';
@@ -1337,7 +1352,9 @@
       addBtn.innerHTML = iconoMas_() + '<span>Añadir línea</span>';
       addBtn.addEventListener('click', function () {
         const newRow = {};
-        columns.forEach(function (col) { newRow[col] = null; });
+        columns.forEach(function (col) {
+          newRow[col] = (COLUMNAS_SI_NO.indexOf(col) !== -1) ? false : null;
+        });
         currentBudget[key].push(newRow);
         tbody.appendChild(buildTableRow(newRow, columns));
         recalcularTotales_();
@@ -1361,7 +1378,7 @@
      * seguridad para campos futuros no contemplados todavía.
      */
     const KNOWN_COLUMN_ORDER = {
-      'Líneas del presupuesto': ['Referencia', 'Designación', 'Cantidad', 'Precio €', '%', 'Total', 'Línea']
+      'Líneas del presupuesto': ['Referencia', 'Designación', 'Cantidad', 'Precio €', '%', 'Total', 'Oferta', 'Oferta hasta', 'Línea']
     };
 
     function collectColumns(items, tableKey) {
@@ -1389,9 +1406,26 @@
       columns.forEach(function (col) {
         const td = document.createElement('td');
         td.dataset.col = col;
+        const value = rowObj[col];
+
+        // Los campos de si/no (hoy solo "Oferta") se editan con una casilla,
+        // no escribiendo "true" a mano.
+        if (COLUMNAS_SI_NO.indexOf(col) !== -1) {
+          const casilla = document.createElement('input');
+          casilla.type = 'checkbox';
+          casilla.checked = (value === true || String(value).toLowerCase() === 'true');
+          casilla.title = 'Marcar si esta línea es un precio promocional';
+          casilla.addEventListener('change', function () {
+            rowObj[col] = casilla.checked;
+          });
+          inputsPorColumna[col] = casilla;
+          td.appendChild(casilla);
+          tr.appendChild(td);
+          return;
+        }
+
         const input = document.createElement('input');
         input.type = 'text';
-        const value = rowObj[col];
         input.value = value === null || value === undefined ? '' : value;
         const wasNumber = typeof value === 'number';
         inputsPorColumna[col] = input;
