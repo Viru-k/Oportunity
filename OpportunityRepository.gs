@@ -173,6 +173,15 @@ function textoFecha_(v) {
  */
 function ordenFecha_(v) {
   if (v instanceof Date) return v.getTime();
+  if (v === null || v === undefined || v === '') return 0;
+
+  // La fecha del presupuesto se guarda como dd/MM/yyyy, que Date.parse
+  // interpreta mal o no interpreta. Se reconoce a mano antes de recurrir a el.
+  const m = String(v).match(/^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+  }
+
   const t = Date.parse(v);
   return isNaN(t) ? 0 : t;
 }
@@ -210,9 +219,11 @@ function buscarOportunidadesPorTexto(query) {
     // extra de la hoja.
     let total = 0;
     let textoLineas = '';
+    let vendedor = '';
     try {
       const guardado = JSON.parse(row[COL_JSON_ - 1]);
       total = Number(guardado['Total']) || 0;
+      vendedor = String(guardado['Vendedor'] || '');
       const lineas = guardado['Líneas del presupuesto'];
       if (Array.isArray(lineas)) {
         textoLineas = lineas.map(function (l) {
@@ -221,7 +232,7 @@ function buscarOportunidadesPorTexto(query) {
       }
     } catch (e) { /* fila corrupta: se lista igualmente, con total 0 */ }
 
-    const haystack = normalizarTexto_(op + ' ' + cliente + ' ' + telefono + ' ' + textoLineas);
+    const haystack = normalizarTexto_(op + ' ' + cliente + ' ' + telefono + ' ' + vendedor + ' ' + textoLineas);
 
     const matches = words.length === 0 || words.every(function (w) { return haystack.indexOf(w) !== -1; });
     if (!matches) return;
@@ -235,6 +246,10 @@ function buscarOportunidadesPorTexto(query) {
       fecha: textoFecha_(row[COL_FECHA_ - 1]),
       modificado: textoFecha_(row[COL_MODIFICADO_ - 1]),
       orden: ordenFecha_(row[COL_MODIFICADO_ - 1]),
+      // Vendedor y fecha del presupuesto en forma comparable, para que la
+      // pantalla pueda filtrar por ambos sin volver a interpretar textos.
+      vendedor: vendedor,
+      fechaOrden: ordenFecha_(row[COL_FECHA_ - 1]),
       total: Number(total) || 0,
       // Texto ya normalizado por el que se puede filtrar. Viaja con cada
       // resultado para que el buscador de la pantalla filtre en el propio

@@ -497,6 +497,54 @@
       font-size: 14px;
     }
 
+    #filtros {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .filtro {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .filtro label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .filtro input,
+    .filtro select {
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .filtro select { min-width: 150px; }
+
+    #limpiarFiltros {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    #limpiarFiltros:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     #searchResults {
       margin-top: 12px;
       max-height: 420px;
@@ -608,7 +656,22 @@
       <div class="panel" id="searchPanel">
         <h2 style="font-size:15px;margin:0 0 12px;">Base de datos de presupuestos</h2>
         <div id="searchBox">
-          <input type="text" id="searchInput" placeholder="Buscar por número OP, cliente o teléfono...">
+          <input type="text" id="searchInput" placeholder="Buscar por número OP, cliente, teléfono o producto...">
+        </div>
+        <div id="filtros">
+          <div class="filtro">
+            <label for="filtroVendedor">Vendedor</label>
+            <select id="filtroVendedor"><option value="">Todos</option></select>
+          </div>
+          <div class="filtro">
+            <label for="filtroDesde">Desde</label>
+            <input type="date" id="filtroDesde">
+          </div>
+          <div class="filtro">
+            <label for="filtroHasta">Hasta</label>
+            <input type="date" id="filtroHasta">
+          </div>
+          <button id="limpiarFiltros" type="button">Limpiar filtros</button>
         </div>
         <div id="searchResults"></div>
         <div id="searchStatus"></div>
@@ -666,6 +729,10 @@
     const copyBtn = document.getElementById('copyBtn');
 
     const searchInput = document.getElementById('searchInput');
+    const filtroVendedor = document.getElementById('filtroVendedor');
+    const filtroDesde = document.getElementById('filtroDesde');
+    const filtroHasta = document.getElementById('filtroHasta');
+    const limpiarFiltros = document.getElementById('limpiarFiltros');
     const searchResults = document.getElementById('searchResults');
     const searchStatus = document.getElementById('searchStatus');
 
@@ -691,6 +758,9 @@
     document.getElementById('goDatabaseBtn').addEventListener('click', function () {
       showView(viewDatabase);
       searchInput.value = '';
+      filtroVendedor.value = '';
+      filtroDesde.value = '';
+      filtroHasta.value = '';
       cargarOportunidades();
     });
     document.getElementById('backFromDatabaseBtn').addEventListener('click', showDashboard);
@@ -1287,6 +1357,7 @@
       google.script.run
         .withSuccessHandler(function (results) {
           oportunidades = results || [];
+          poblarVendedores_();
           aplicarFiltro();
         })
         .withFailureHandler(function (err) {
@@ -1303,79 +1374,110 @@
      * Filtra en local lo ya cargado. Cada palabra escrita tiene que
      * aparecer en algun sitio del presupuesto, sin importar el orden.
      */
+    /**
+     * Filtra en local lo ya cargado, combinando los tres criterios: el
+     * texto libre, el vendedor y el rango de fechas del presupuesto. Se
+     * aplican a la vez, asi que acotan entre ellos.
+     */
     function aplicarFiltro() {
       const query = searchInput.value.trim().toLowerCase();
       const words = query.split(/\s+/).filter(Boolean);
+      const vendedor = filtroVendedor.value;
+      const desde = limiteFecha_(filtroDesde.value, false);
+      const hasta = limiteFecha_(filtroHasta.value, true);
 
-      const visibles = words.length === 0
-        ? oportunidades
-        : oportunidades.filter(function (o) {
-            const texto = String(o.busqueda || '');
-            return words.every(function (w) { return texto.indexOf(w) !== -1; });
-          });
+      const visibles = oportunidades.filter(function (o) {
+        if (words.length) {
+          const texto = String(o.busqueda || '');
+          if (!words.every(function (w) { return texto.indexOf(w) !== -1; })) return false;
+        }
+
+        if (vendedor && String(o.vendedor || '') !== vendedor) return false;
+
+        // Un presupuesto sin fecha legible (fechaOrden 0) queda fuera en
+        // cuanto se acota por fechas: no se puede afirmar que caiga dentro.
+        if (desde !== null && !(o.fechaOrden > 0 && o.fechaOrden >= desde)) return false;
+        if (hasta !== null && !(o.fechaOrden > 0 && o.fechaOrden <= hasta)) return false;
+
+        return true;
+      });
 
       renderSearchResults(visibles);
+      actualizarEstado_(visibles.length);
+    }
 
+    /**
+     * Convierte lo que da un campo de fecha (aaaa-mm-dd) en un limite
+     * comparable. El limite superior se lleva al final del dia, para que
+     * "hasta el 24" incluya el 24 entero.
+     */
+    function limiteFecha_(valor, finDeDia) {
+      if (!valor) return null;
+      const p = valor.split('-');
+      if (p.length !== 3) return null;
+      return finDeDia
+        ? new Date(+p[0], +p[1] - 1, +p[2], 23, 59, 59, 999).getTime()
+        : new Date(+p[0], +p[1] - 1, +p[2], 0, 0, 0, 0).getTime();
+    }
+
+    function hayFiltros_() {
+      return !!(searchInput.value.trim() || filtroVendedor.value ||
+                filtroDesde.value || filtroHasta.value);
+    }
+
+    function actualizarEstado_(visibles) {
       searchStatus.classList.remove('error');
+
       if (!oportunidades.length) {
         explicarListadoVacio_();
-      } else if (!visibles.length) {
+      } else if (!visibles) {
         searchStatus.textContent = 'Ninguno de los ' + oportunidades.length +
-          ' presupuestos coincide con "' + searchInput.value.trim() + '".';
-      } else if (visibles.length === oportunidades.length) {
+          ' presupuestos cumple los filtros.';
+      } else if (visibles === oportunidades.length) {
         searchStatus.textContent = oportunidades.length === 1
           ? '1 presupuesto'
           : oportunidades.length + ' presupuestos';
       } else {
-        searchStatus.textContent = visibles.length + ' de ' + oportunidades.length + ' presupuestos';
+        searchStatus.textContent = visibles + ' de ' + oportunidades.length + ' presupuestos';
       }
     }
 
     /**
-     * Un listado vacio casi nunca significa "no hay presupuestos": suele
-     * significar "estan en otra pestaña". En vez de dejar al usuario a
-     * ciegas, se le dice donde ha mirado la aplicacion y donde mas hay
-     * datos, para que la diferencia se vea de un vistazo.
+     * Rellena el desplegable de vendedores con los que aparecen de verdad
+     * en los presupuestos cargados, en vez de con una lista fija que habria
+     * que mantener a mano.
      */
-    function explicarListadoVacio_() {
-      searchStatus.textContent = 'No hay presupuestos guardados.';
+    function poblarVendedores_() {
+      const vistos = [];
+      oportunidades.forEach(function (o) {
+        const v = String(o.vendedor || '').trim();
+        if (v && vistos.indexOf(v) === -1) vistos.push(v);
+      });
+      vistos.sort(function (a, b) { return a.localeCompare(b, 'es'); });
 
-      google.script.run
-        .withSuccessHandler(function (info) {
-          if (!info) return;
-
-          let texto = 'No hay presupuestos en la pestaña "' + info.pestana +
-            '" (' + info.filas + ' filas, la busqueda devuelve ' + info.presupuestos + ')' +
-            ' del fichero "' + info.fichero + '" (ID ' + info.ficheroId + ').' +
-            ' Codigo v' + info.version + '.';
-
-          if (info.otrasPestanas && info.otrasPestanas.length) {
-            texto += ' Pestañas de ese fichero: ' +
-              info.otrasPestanas.map(function (p) {
-                return '"' + p.nombre + '" (' + p.filas + ')';
-              }).join(', ') + '.';
-          }
-
-          searchStatus.textContent = texto;
-
-          // Enlace directo al fichero que esta usando de verdad, para poder
-          // comprobar de un clic si es el que se cree que es.
-          if (info.url) {
-            const enlace = document.createElement('a');
-            enlace.href = info.url;
-            enlace.target = '_blank';
-            enlace.textContent = 'Abrir esa hoja de calculo';
-            enlace.style.cssText = 'display:inline-block;margin-top:6px;color:var(--accent);font-size:12px;';
-            searchStatus.appendChild(document.createElement('br'));
-            searchStatus.appendChild(enlace);
-          }
-        })
-        .withFailureHandler(function () {
-          // Si ni siquiera se puede consultar donde mira, se deja el
-          // mensaje simple: no merece la pena tapar un error con otro.
-        })
-        .obtenerInfoAlmacen();
+      const seleccionado = filtroVendedor.value;
+      filtroVendedor.innerHTML = '<option value="">Todos</option>';
+      vistos.forEach(function (v) {
+        const op = document.createElement('option');
+        op.value = v;
+        op.textContent = v;
+        filtroVendedor.appendChild(op);
+      });
+      // Se conserva la seleccion si ese vendedor sigue existiendo.
+      if (vistos.indexOf(seleccionado) !== -1) filtroVendedor.value = seleccionado;
     }
+
+    [filtroVendedor, filtroDesde, filtroHasta].forEach(function (control) {
+      control.addEventListener('change', aplicarFiltro);
+    });
+
+    limpiarFiltros.addEventListener('click', function () {
+      searchInput.value = '';
+      filtroVendedor.value = '';
+      filtroDesde.value = '';
+      filtroHasta.value = '';
+      aplicarFiltro();
+    });
 
     // Filtrado instantaneo: como los datos ya estan en memoria, no hace
     // falta esperar ni ir al servidor entre pulsacion y pulsacion.
