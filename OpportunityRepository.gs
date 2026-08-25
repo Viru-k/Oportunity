@@ -245,6 +245,15 @@ function obtenerInfoAlmacen_() {
     });
 
   return {
+    // Sello del codigo que esta sirviendo la web app. Si no coincide con la
+    // version que se acaba de pegar, el despliegue esta sirviendo codigo
+    // antiguo: es la explicacion de que el editor y la pantalla vean cosas
+    // distintas del mismo fichero.
+    version: APP_VERSION,
+    // Lo que devuelve de verdad la lectura, medido aqui mismo. Si hay filas
+    // pero esto es cero, el problema esta en la busqueda; si no hay filas,
+    // esta en que pestaña se esta usando.
+    presupuestos: buscarOportunidadesPorTexto('').length,
     fichero: ss.getName(),
     // El ID identifica el fichero sin lugar a dudas. El nombre no sirve:
     // puede haber varias hojas de calculo llamadas igual, y confundirlas es

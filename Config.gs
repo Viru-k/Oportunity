@@ -55,7 +55,7 @@ const DEBUG = true;
  * versión se generó un documento concreto); no es un dato de cara al
  * cliente ni forma parte del presupuesto.
  */
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0-listado';
 
 /**
  * Clave de Script Properties donde OpportunityRepository.gs guarda el
