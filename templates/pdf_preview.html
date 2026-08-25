@@ -93,8 +93,7 @@
   table.items td.desc{text-align:left;text-transform:uppercase;}
   table.items tbody td{font-size:10.5px;overflow-wrap:break-word;}
   table.items td.num{font-variant-numeric:tabular-nums;}
-  table.items tr.promo td{border-top:none;font-size:9.5px;font-style:italic;color:var(--ink-soft);}
-  table.items tr.promo td.desc{padding-left:16px;text-transform:none;}
+  table.items span.promo{display:block;margin-top:2px;font-size:9px;font-style:italic;text-transform:none;color:var(--ink-soft);}
   .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:30px;}
   .totals{width:72mm;}
   .totals-row{display:flex;justify-content:space-between;padding:2px 0;}
@@ -204,7 +203,7 @@ const FOOTER_RESERVE_MM = 28;     // = padding-bottom de .content
 const THEAD_MM = 7;
 const TABLE_MARGIN_MM = 4.5;
 const TOTALS_MM = 42;             // totales + firma
-const PROMO_ROW_MM = 6.7;      // sublinea de promocion, medida
+const PROMO_LINE_MM = 4.4;     // lo que crece la fila con la nota, medido
 const ROW_BASE_MM = 2.8;
 const ROW_LINE_MM = 4.1;
 const DESC_CHARS_PER_LINE = 40;   // columna Designación, 67,7mm útiles
@@ -231,10 +230,10 @@ const BUDGET = {
   'Dirección': 'Rúa Nueva, 14, 3º B',
   'Correo electrónico': 'juan.perez@example.com',
   'Líneas del presupuesto': [
-    { 'Referencia':'PC-20120-GR', 'Designación':'Pavimento porcelánico 20x120 cm, acabado mate gris', 'Cantidad':42, 'Precio €':24.90, '%':10, 'Total':940.98, 'Oferta':true, 'Oferta hasta':'24/08/2026', 'Línea':1 },
+    { 'Referencia':'PC-20120-GR', 'Designación':'Pavimento porcelánico 20x120 cm, acabado mate gris', 'Cantidad':42, 'Precio €':24.90, '%':10, 'Total':940.98, 'Oferta':true, 'Línea':1 },
     { 'Referencia':'AD-C2-25KG',  'Designación':'Adhesivo cementoso C2 flexible, saco 25 kg', 'Cantidad':6, 'Precio €':18.40, '%':0, 'Total':110.40, 'Línea':2 },
     { 'Referencia':'MR-FLEX-20',  'Designación':'Mortero autonivelante flexible, saco 20 kg', 'Cantidad':4, 'Precio €':21.10, '%':0, 'Total':84.40, 'Línea':3 },
-    { 'Referencia':'RD-ALU-260',  'Designación':'Rodapié de aluminio anodizado, barra 2,60 m', 'Cantidad':14, 'Precio €':9.75, '%':5, 'Total':129.68, 'Oferta':true, 'Oferta hasta':null, 'Línea':4 },
+    { 'Referencia':'RD-ALU-260',  'Designación':'Rodapié de aluminio anodizado, barra 2,60 m', 'Cantidad':14, 'Precio €':9.75, '%':5, 'Total':129.68, 'Oferta':true, 'Línea':4 },
     { 'Referencia':'CU-NIV-100',  'Designación':'Cuñas de nivelación, bolsa 100 unidades', 'Cantidad':3, 'Precio €':6.20, '%':0, 'Total':18.60, 'Línea':5 },
     { 'Referencia':'CR-NIV-2MM',  'Designación':'Crucetas de nivelación 2 mm, bolsa 250 unidades', 'Cantidad':3, 'Precio €':5.85, '%':0, 'Total':17.55, 'Línea':6 },
     { 'Referencia':'PF-ALU-270',  'Designación':'Perfil de aluminio de remate, barra 2,70 m', 'Cantidad':8, 'Precio €':11.30, '%':8, 'Total':83.17, 'Línea':7 },
@@ -307,7 +306,7 @@ function alturaEstimadaFila(item) {
   const desc = String((item && item['Designación']) || '');
   const lineas = Math.max(1, Math.ceil(desc.length / DESC_CHARS_PER_LINE));
   let alto = ROW_BASE_MM + (lineas * ROW_LINE_MM);
-  if (esPromocion(item)) alto += PROMO_ROW_MM;
+  if (esPromocion(item)) alto += PROMO_LINE_MM;
   return alto;
 }
 
@@ -437,25 +436,19 @@ function buildBudgetHtml(b) {
         ? (Number(item['Cantidad']) || 0) * (Number(item['Precio €']) || 0)
         : item['Total'];
 
-      let html = '<tr>' +
-        '<td class="desc">' + esc(item['Designación'] || '') + '</td>' +
+      const notaDesc = promocion ? '<span class="promo">Precio promocional</span>' : '';
+      const notaImporte = promocion
+        ? '<span class="promo">-' + money(descuentoDeLinea(item)) + '</span>'
+        : '';
+
+      return '<tr>' +
+        '<td class="desc">' + esc(item['Designación'] || '') + notaDesc + '</td>' +
         '<td>' + esc(item['Referencia'] || '') + '</td>' +
         '<td class="num">' + num(item['Cantidad']) + '</td>' +
         '<td class="num">' + num(item['%']) + '</td>' +
         '<td class="num">' + money(item['Precio €']) + '</td>' +
-        '<td class="num">' + money(importe) + '</td>' +
+        '<td class="num">' + money(importe) + notaImporte + '</td>' +
         '</tr>';
-
-      if (promocion) {
-        const hasta = String(item['Oferta hasta'] || '').trim();
-        html += '<tr class="promo">' +
-          '<td class="desc">' + (hasta ? 'Precio promocional hasta el ' + esc(hasta) : 'Precio promocional') + '</td>' +
-          '<td></td><td></td><td></td><td></td>' +
-          '<td class="num">-' + money(descuentoDeLinea(item)) + '</td>' +
-          '</tr>';
-      }
-
-      return html;
     }).join('');
 
     const breakClass = pageIndex === 0 ? '' : ' page-break';

@@ -628,15 +628,14 @@
      */
     table.editable-table[data-key="Líneas del presupuesto"] { table-layout: fixed; }
 
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Referencia"]   { width: 11%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Designación"]  { width: 27%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Cantidad"]     { width: 8%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Precio €"]     { width: 10%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="%"]            { width: 6%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Total"]        { width: 11%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Oferta"]       { width: 7%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Oferta hasta"] { width: 12%; }
-    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Línea"]        { width: 5%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Referencia"]  { width: 12%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Designación"] { width: 32%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Cantidad"]    { width: 8%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Precio €"]    { width: 11%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="%"]           { width: 6%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Total"]       { width: 12%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Oferta"]      { width: 7%; }
+    table.editable-table[data-key="Líneas del presupuesto"] [data-col="Línea"]       { width: 5%; }
 
     /* La casilla de oferta se centra en su celda: es un si o un no, no un
        dato que haya que leer alineado con los importes. */
@@ -1378,7 +1377,7 @@
      * seguridad para campos futuros no contemplados todavía.
      */
     const KNOWN_COLUMN_ORDER = {
-      'Líneas del presupuesto': ['Referencia', 'Designación', 'Cantidad', 'Precio €', '%', 'Total', 'Oferta', 'Oferta hasta', 'Línea']
+      'Líneas del presupuesto': ['Referencia', 'Designación', 'Cantidad', 'Precio €', '%', 'Total', 'Oferta', 'Línea']
     };
 
     function collectColumns(items, tableKey) {

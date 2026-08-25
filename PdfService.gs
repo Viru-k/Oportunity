@@ -133,10 +133,11 @@
  *   junto a la cantidad. Hasta ahora el descuento se aplicaba en silencio
  *   y solo se imprimía el importe neto, de modo que el documento no dejaba
  *   constancia de que ese precio era promocional.
- * - El presupuesto oficial lo resuelve con dos filas: la línea a precio
- *   completo y, debajo, una sublínea "Precio promocional hasta el ..." con
- *   el descuento en negativo. Se reproduce ese mismo criterio, que además
- *   es el que permite al cliente ver cuánto se le está descontando.
+ * - El presupuesto oficial lo resuelve dentro de la propia fila, no en una
+ *   fila aparte: bajo la designación aparece la nota "Precio promocional",
+ *   y bajo el importe, en esa misma celda, el descuento en negativo. El
+ *   importe de la línea pasa a ser el precio completo, de modo que el
+ *   cliente ve cuánto se le está descontando.
  * - Solo cambia la presentación: el Subtotal sigue siendo la suma de los
  *   importes netos, porque completo menos descuento es el neto de siempre.
  *
@@ -192,8 +193,9 @@ var TABLE_MARGIN_MM_ = 4.5;
 var TOTALS_MM_ = 42;
 
 // Alto de una fila: una base más un incremento por cada línea de texto.
-// Alto de la sublinea de promocion, medido sobre el documento renderizado.
-var PROMO_ROW_MM_ = 6.7;
+// Lo que crece una fila al llevar la nota de promocion, medido sobre el
+// documento renderizado.
+var PROMO_LINE_MM_ = 4.4;
 
 var ROW_BASE_MM_ = 2.8;
 var ROW_LINE_MM_ = 4.1;
@@ -225,10 +227,10 @@ function alturaEstimadaFila_(item) {
   const lineas = Math.max(1, Math.ceil(desc.length / DESC_CHARS_PER_LINE_));
   let alto = ROW_BASE_MM_ + (lineas * ROW_LINE_MM_);
 
-  // Una linea en promocion imprime debajo una sublinea propia con el
-  // descuento. Sin contarla, el folio se pasaria de alto.
+  // Una linea en promocion añade una linea de texto dentro de sus propias
+  // celdas. Sin contarla, el folio se pasaria de alto.
   if (esPromocion_(item)) {
-    alto += PROMO_ROW_MM_;
+    alto += PROMO_LINE_MM_;
   }
 
   return alto;
@@ -455,29 +457,22 @@ function buildBudgetHtml_(b) {
         ? (Number(item['Cantidad']) || 0) * (Number(item['Precio €']) || 0)
         : item['Total'];
 
-      let html = '<tr>' +
-        '<td class="desc">' + esc(item['Designación'] || '') + '</td>' +
+      // La nota y el descuento van dentro de las celdas de la propia fila,
+      // no en una fila aparte: asi quedan pegados al articulo al que
+      // pertenecen aunque la tabla se corte entre folios.
+      const notaDesc = promocion ? '<span class="promo">Precio promocional</span>' : '';
+      const notaImporte = promocion
+        ? '<span class="promo">-' + money(descuentoDeLinea_(item)) + '</span>'
+        : '';
+
+      return '<tr>' +
+        '<td class="desc">' + esc(item['Designación'] || '') + notaDesc + '</td>' +
         '<td>' + esc(item['Referencia'] || '') + '</td>' +
         '<td class="num">' + num(item['Cantidad']) + '</td>' +
         '<td class="num">' + num(item['%']) + '</td>' +
         '<td class="num">' + money(item['Precio €']) + '</td>' +
-        '<td class="num">' + money(importe) + '</td>' +
+        '<td class="num">' + money(importe) + notaImporte + '</td>' +
         '</tr>';
-
-      if (promocion) {
-        const hasta = String(item['Oferta hasta'] || '').trim();
-        const texto = hasta
-          ? 'Precio promocional hasta el ' + esc(hasta)
-          : 'Precio promocional';
-
-        html += '<tr class="promo">' +
-          '<td class="desc">' + texto + '</td>' +
-          '<td></td><td></td><td></td><td></td>' +
-          '<td class="num">-' + money(descuentoDeLinea_(item)) + '</td>' +
-          '</tr>';
-      }
-
-      return html;
     }).join('');
 
     // page-break-before:always en todos los bloques MENOS el primero
@@ -540,11 +535,10 @@ function buildBudgetHtml_(b) {
     '  table.items td.desc{text-align:left;text-transform:uppercase;}' +
     '  table.items tbody td{font-size:10.5px;overflow-wrap:break-word;}' +
     '  table.items td.num{font-variant-numeric:tabular-nums;}' +
-    // La sublinea de promocion pertenece a la fila de arriba: se le quita
-    // el borde superior y se sangra, para que se lea como una nota de esa
-    // linea y no como un articulo mas.
-    '  table.items tr.promo td{border-top:none;font-size:9.5px;font-style:italic;color:var(--ink-soft);}' +
-    '  table.items tr.promo td.desc{padding-left:16px;text-transform:none;}' +
+    // La nota de promocion vive dentro de la celda, en su propia linea:
+    // mas pequeña, en cursiva y sin mayusculas, para que se lea como una
+    // aclaracion del dato de arriba y no como otro dato.
+    '  table.items span.promo{display:block;margin-top:2px;font-size:9px;font-style:italic;text-transform:none;color:var(--ink-soft);}' +
     '  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:30px;}' +
     '  .totals{width:72mm;}' +
     '  .totals-row{display:flex;justify-content:space-between;padding:2px 0;}' +

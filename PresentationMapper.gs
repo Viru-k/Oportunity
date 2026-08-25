@@ -54,10 +54,10 @@ const ITEM_FIELD_ORDER_ = [
   { key: 'lineTotal', label: 'Total' },
   { key: 'lineNumber', label: 'Línea' },
   // Sprint 015: una linea marcada como promocion en la captura (la carita
-  // junto a la cantidad) se imprime en el PDF como el presupuesto oficial:
-  // la linea a precio completo y debajo el descuento en negativo.
-  { key: 'isOffer', label: 'Oferta' },
-  { key: 'offerUntil', label: 'Oferta hasta' }
+  // junto a la cantidad) se imprime en el PDF a precio completo, con la
+  // nota "Precio promocional" bajo la designacion y el descuento bajo el
+  // importe, dentro de sus mismas celdas.
+  { key: 'isOffer', label: 'Oferta' }
 ];
 
 /**
