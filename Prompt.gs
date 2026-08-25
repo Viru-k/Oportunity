@@ -14,7 +14,10 @@ const PROMPT = {
     'No interpretas, no decides, no inventas información. ' +
     'El iva sale de la resta del total - el subtotal. ' +
     'Si un dato no aparece en las imágenes, devuélvelo como null. ' +
-    'Si hay lineas tachadas, ignora esa linea ' +
+    'Si hay lineas tachadas, ignora esa linea. ' +
+    'El vendedor aparece en la cabecera detras de "por el". Ese "el" es un ' +
+    'articulo y NO forma parte del nombre: en "por el ANXO P." el vendedor ' +
+    'es "ANXO P.", nunca "ELANXO P.". ' +
     'Si una linea lleva un icono de cara sonriente junto a la cantidad, ' +
     'su precio es promocional: devuelve "isOffer": true en esa linea. ' +
     'En el resto de lineas devuelve "isOffer": false. ' +
