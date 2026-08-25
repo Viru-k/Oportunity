@@ -1100,8 +1100,10 @@
        - Línea: Cantidad × Precio € × (1 − % / 100). Solo se recalcula al
          editar una de esas tres columnas; si escribes directamente en
          Total, se respeta lo que pongas.
-       - Documento: Subtotal = suma de los totales de línea, y
-         Total = Subtotal × (1 + IVA).
+       - Documento: los importes de la captura ya incluyen el impuesto,
+         así que la suma de las líneas es el Total CON IVA. El Subtotal
+         sale de dividir ese total entre 1 + IVA, y el IVA es la
+         diferencia. Antes se sumaba un 21% que ya estaba dentro.
 
        Solo se tocan los campos que ya existan en el presupuesto: si la
        extracción no trajo Subtotal, no se inventa uno (mismo criterio
@@ -1113,6 +1115,7 @@
     const COLUMNA_TOTAL_LINEA = 'Total';
     const CAMPO_SUBTOTAL = 'Subtotal';
     const CAMPO_TOTAL = 'Total';
+    const CAMPO_IVA = 'IVA';
     const TABLA_LINEAS = 'Líneas del presupuesto';
 
     function aNumero_(v) {
@@ -1171,19 +1174,26 @@
     function recalcularTotales_() {
       if (!currentBudget || !Array.isArray(currentBudget[TABLA_LINEAS])) return;
 
-      const subtotal = redondear2_(currentBudget[TABLA_LINEAS].reduce(function (acc, linea) {
+      const total = redondear2_(currentBudget[TABLA_LINEAS].reduce(function (acc, linea) {
         return acc + totalEfectivoLinea_(linea);
       }, 0));
 
-      if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_SUBTOTAL)) {
-        currentBudget[CAMPO_SUBTOTAL] = subtotal;
-        refrescarCampo_(CAMPO_SUBTOTAL, subtotal);
-      }
+      const base = redondear2_(total / (1 + IVA_RATE));
 
       if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_TOTAL)) {
-        const total = redondear2_(subtotal * (1 + IVA_RATE));
         currentBudget[CAMPO_TOTAL] = total;
         refrescarCampo_(CAMPO_TOTAL, total);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_SUBTOTAL)) {
+        currentBudget[CAMPO_SUBTOTAL] = base;
+        refrescarCampo_(CAMPO_SUBTOTAL, base);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(currentBudget, CAMPO_IVA)) {
+        const iva = redondear2_(total - base);
+        currentBudget[CAMPO_IVA] = iva;
+        refrescarCampo_(CAMPO_IVA, iva);
       }
     }
 

@@ -128,6 +128,20 @@
  *   bloque .content (después de la última tabla), no en un bloque
  *   .content aparte. Así fluyen naturalmente tras la última fila.
  *
+ * Sprint 016 (tipo de IVA e importes con impuesto incluido):
+ * - La columna "Tipo IVA" imprimía el porcentaje de descuento de la línea,
+ *   no el tipo impositivo. Mientras todas las líneas iban sin descuento
+ *   salía 0,00 y no llamaba la atención; con una promoción al 10% pasó a
+ *   leerse como si ese artículo tributara al 10%. Ahora imprime el tipo
+ *   configurado en CONFIG.IVA_RATE. El descuento no vuelve a la tabla: en
+ *   el documento oficial tampoco aparece como columna, solo como la nota
+ *   de precio promocional.
+ * - Los importes que devuelve la captura YA incluyen el IVA. Se comprueba
+ *   en los dos documentos: Pixis muestra "Total 1.145,76 IVA / 946,91 Sin
+ *   IVA" para unas líneas que suman 1.145,76, y en el presupuesto oficial
+ *   las líneas suman 1.517,87, que es su "Total con IVA". El cálculo vive
+ *   en BudgetNormalizer.gs; aquí solo se imprime lo que llega.
+ *
  * Sprint 015 (líneas en promoción):
  * - En la captura, una línea en oferta lleva un icono de cara sonriente
  *   junto a la cantidad. Hasta ahora el descuento se aplicaba en silencio
@@ -469,7 +483,7 @@ function buildBudgetHtml_(b) {
         '<td class="desc">' + esc(item['Designación'] || '') + notaDesc + '</td>' +
         '<td>' + esc(item['Referencia'] || '') + '</td>' +
         '<td class="num">' + num(item['Cantidad']) + '</td>' +
-        '<td class="num">' + num(item['%']) + '</td>' +
+        '<td class="num">' + num(CONFIG.IVA_RATE * 100) + '</td>' +
         '<td class="num">' + money(item['Precio €']) + '</td>' +
         '<td class="num">' + money(importe) + notaImporte + '</td>' +
         '</tr>';

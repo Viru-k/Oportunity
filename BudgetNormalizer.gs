@@ -29,9 +29,11 @@
  * 1. Total de cada linea: si no viene, se calcula como
  *    cantidad x precio x (1 - % / 100). Si viene, se respeta tal cual:
  *    puede haberlo escrito una persona a mano.
- * 2. Subtotal: suma de los totales de linea.
- * 3. IVA: Subtotal x CONFIG.IVA_RATE.
- * 4. Total: Subtotal + IVA.
+ * 2. Total: suma de los totales de linea. Los importes de la captura YA
+ *    incluyen el impuesto, asi que esa suma es el total CON IVA, no una
+ *    base a la que haya que sumarselo.
+ * 3. Subtotal: Total dividido entre 1 + CONFIG.IVA_RATE.
+ * 4. IVA: la diferencia entre ambos.
  *
  * Los pasos 2 a 4 solo se aplican si el presupuesto tiene alguna linea
  * con importe. Si la extraccion no saco ninguna linea pero si un total,
@@ -68,12 +70,20 @@ function normalizarImportes(budget) {
 
   if (!hayImportes) return budget;
 
-  subtotal = redondearImporte_(subtotal);
-  const iva = redondearImporte_(subtotal * CONFIG.IVA_RATE);
+  // La suma de las lineas es el total CON impuesto: en la captura los
+  // importes ya lo llevan dentro. Se comprueba en los dos documentos de
+  // referencia: Pixis muestra "Total 1.145,76 IVA / 946,91 Sin IVA" para
+  // unas lineas que suman 1.145,76, y en el presupuesto oficial las lineas
+  // suman 1.517,87, que es justo su "Total con IVA".
+  //
+  // Antes esta suma se tomaba como base imponible y se le añadia un 21%
+  // que ya estaba dentro, inflando el documento en ese porcentaje.
+  const total = redondearImporte_(subtotal);
+  const base = redondearImporte_(total / (1 + CONFIG.IVA_RATE));
 
-  budget['Subtotal'] = subtotal;
-  budget['IVA'] = iva;
-  budget['Total'] = redondearImporte_(subtotal + iva);
+  budget['Total'] = total;
+  budget['Subtotal'] = base;
+  budget['IVA'] = redondearImporte_(total - base);
 
   return budget;
 }

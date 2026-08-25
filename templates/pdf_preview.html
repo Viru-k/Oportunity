@@ -203,6 +203,7 @@ const FOOTER_RESERVE_MM = 28;     // = padding-bottom de .content
 const THEAD_MM = 7;
 const TABLE_MARGIN_MM = 4.5;
 const TOTALS_MM = 42;             // totales + firma
+const IVA_RATE = 0.21;         // espejo de CONFIG.IVA_RATE
 const PROMO_LINE_MM = 4.4;     // lo que crece la fila con la nota, medido
 const ROW_BASE_MM = 2.8;
 const ROW_LINE_MM = 4.1;
@@ -255,8 +256,11 @@ const BUDGET = {
     { 'Referencia':'CB-25MM-100', 'Designación':'Cable flexible 2,5 mm², rollo 100 m', 'Cantidad':2, 'Precio €':68.40, '%':0, 'Total':136.80, 'Línea':23 },
     { 'Referencia':'CJ-EMPAL-10', 'Designación':'Caja de empalme estanca IP55, 100x100 mm', 'Cantidad':9, 'Precio €':4.95, '%':0, 'Total':44.55, 'Línea':24 }
   ],
-  'Subtotal': 2911.68,
-  'Total': 3523.13
+  // Los importes ya incluyen el impuesto: el Total es la suma de las
+  // lineas y el Subtotal sale de dividirlo entre 1,21 (ver
+  // BudgetNormalizer.gs).
+  'Subtotal': 2360.65,
+  'Total': 2856.39
 };
 
 /* ---- Formateadores: espejo de formatMoney_ / formatNumber_ ----
@@ -445,7 +449,7 @@ function buildBudgetHtml(b) {
         '<td class="desc">' + esc(item['Designación'] || '') + notaDesc + '</td>' +
         '<td>' + esc(item['Referencia'] || '') + '</td>' +
         '<td class="num">' + num(item['Cantidad']) + '</td>' +
-        '<td class="num">' + num(item['%']) + '</td>' +
+        '<td class="num">' + num(IVA_RATE * 100) + '</td>' +
         '<td class="num">' + money(item['Precio €']) + '</td>' +
         '<td class="num">' + money(importe) + notaImporte + '</td>' +
         '</tr>';
