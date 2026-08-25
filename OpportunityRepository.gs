@@ -149,6 +149,35 @@ function normalizarTexto_(s) {
 }
 
 /**
+ * Convierte a texto un valor de fecha venido de la hoja.
+ *
+ * Es imprescindible, no cosmetico. Las columnas Fecha y Modificado llegan
+ * de Sheets como objetos Date, y google.script.run no los transporta de
+ * forma fiable al navegador: la llamada "tiene exito" pero entrega un
+ * array vacio, sin lanzar ningun error. El resultado era un listado a cero
+ * teniendo el servidor los 85 presupuestos contados. Todo lo que se
+ * devuelva al frontend tiene que ser texto, numero, booleano o null.
+ */
+function textoFecha_(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  }
+  return String(v);
+}
+
+/**
+ * Valor numerico con el que ordenar por fecha de modificacion. Se calcula
+ * en el servidor, antes de convertir la fecha a texto, para no tener que
+ * volver a interpretarla en el navegador.
+ */
+function ordenFecha_(v) {
+  if (v instanceof Date) return v.getTime();
+  const t = Date.parse(v);
+  return isNaN(t) ? 0 : t;
+}
+
+/**
  * Búsqueda / listado de oportunidades: sirve tanto de "base de datos"
  * (query vacía devuelve las últimas, ordenadas por fecha de modificación
  * descendente) como de buscador inteligente (con texto, filtra por
@@ -198,13 +227,15 @@ function buscarOportunidadesPorTexto(query) {
     if (!matches) return;
 
     results.push({
-      uuid: row[COL_UUID_ - 1],
+      uuid: String(row[COL_UUID_ - 1] || ''),
       op: op,
       cliente: cliente,
       telefono: telefono,
-      fecha: row[COL_FECHA_ - 1],
-      modificado: row[COL_MODIFICADO_ - 1],
-      total: total,
+      // Texto, nunca Date: ver textoFecha_.
+      fecha: textoFecha_(row[COL_FECHA_ - 1]),
+      modificado: textoFecha_(row[COL_MODIFICADO_ - 1]),
+      orden: ordenFecha_(row[COL_MODIFICADO_ - 1]),
+      total: Number(total) || 0,
       // Texto ya normalizado por el que se puede filtrar. Viaja con cada
       // resultado para que el buscador de la pantalla filtre en el propio
       // navegador, al instante, sin una llamada al servidor por tecla y
@@ -213,7 +244,8 @@ function buscarOportunidadesPorTexto(query) {
     });
   });
 
-  results.sort(function (a, b) { return new Date(b.modificado) - new Date(a.modificado); });
+  // Se ordena por el valor numerico, no por el texto de la fecha.
+  results.sort(function (a, b) { return b.orden - a.orden; });
 
   // Tope de seguridad para no devolver un listado inmanejable el dia que
   // haya miles de presupuestos. Se aplica siempre, tambien al listar sin
