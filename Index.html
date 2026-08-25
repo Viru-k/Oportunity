@@ -1345,16 +1345,28 @@
           if (!info) return;
 
           let texto = 'No hay presupuestos en la pestaña "' + info.pestana +
-            '" del fichero "' + info.fichero + '".';
+            '" del fichero "' + info.fichero + '" (ID ' + info.ficheroId + ').';
 
           if (info.otrasPestanas && info.otrasPestanas.length) {
-            texto += ' Otras pestañas con datos: ' +
+            texto += ' Pestañas de ese fichero: ' +
               info.otrasPestanas.map(function (p) {
                 return '"' + p.nombre + '" (' + p.filas + ')';
               }).join(', ') + '.';
           }
 
           searchStatus.textContent = texto;
+
+          // Enlace directo al fichero que esta usando de verdad, para poder
+          // comprobar de un clic si es el que se cree que es.
+          if (info.url) {
+            const enlace = document.createElement('a');
+            enlace.href = info.url;
+            enlace.target = '_blank';
+            enlace.textContent = 'Abrir esa hoja de calculo';
+            enlace.style.cssText = 'display:inline-block;margin-top:6px;color:var(--accent);font-size:12px;';
+            searchStatus.appendChild(document.createElement('br'));
+            searchStatus.appendChild(enlace);
+          }
         })
         .withFailureHandler(function () {
           // Si ni siquiera se puede consultar donde mira, se deja el

@@ -242,11 +242,16 @@ function obtenerInfoAlmacen_() {
     .filter(function (s) { return s.getSheetId() !== sheet.getSheetId(); })
     .map(function (s) {
       return { nombre: s.getName(), filas: Math.max(0, s.getLastRow() - 1) };
-    })
-    .filter(function (s) { return s.filas > 0; });
+    });
 
   return {
     fichero: ss.getName(),
+    // El ID identifica el fichero sin lugar a dudas. El nombre no sirve:
+    // puede haber varias hojas de calculo llamadas igual, y confundirlas es
+    // exactamente lo que hace que un listado salga vacio teniendo los datos
+    // guardados en otro sitio.
+    ficheroId: ss.getId(),
+    url: ss.getUrl(),
     pestana: sheet.getName(),
     filas: Math.max(0, sheet.getLastRow() - 1),
     otrasPestanas: otras
