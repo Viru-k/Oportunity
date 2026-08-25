@@ -31,6 +31,7 @@ function onOpen() {
     .createMenu('Oportunity')
     .addItem('Configurar esta hoja como base de datos', 'configurarHojaDeOportunidades')
     .addItem('Ver diagnostico', 'diagnostico')
+    .addItem('Revisar pestaña suelta', 'revisarPestanaSuelta')
     .addToUi();
 }
 
@@ -174,6 +175,120 @@ function diagnostico() {
   }
 
   return volcar_(lineas);
+}
+
+/**
+ * Nombre de la pestaña de la que se quiere rescatar filas sueltas. Se
+ * quedaron ahi presupuestos guardados mientras la aplicacion apuntaba a
+ * una pestaña distinta.
+ */
+const PESTANA_A_RESCATAR_ = 'Oportunidades v2';
+
+/**
+ * Dice que presupuestos de PESTANA_A_RESCATAR_ NO estan en la pestaña en
+ * uso. Solo informa: no escribe nada.
+ *
+ * Importa porque Bitacora localiza cada presupuesto por su UUID en la
+ * pestaña configurada. Un presupuesto que se quedo en otra pestaña existe,
+ * pero es invisible para Bitacora y para el listado.
+ *
+ * Ejecutalo desde el editor y mira el registro.
+ */
+function revisarPestanaSuelta() {
+  const lineas = [];
+  const pendientes = calcularPendientes_(lineas);
+
+  if (pendientes === null) return volcar_(lineas);
+
+  if (pendientes.length === 0) {
+    lineas.push('');
+    lineas.push('Todos los presupuestos de "' + PESTANA_A_RESCATAR_ + '" ya estan');
+    lineas.push('en la pestaña en uso. No hay nada que mover: puedes borrarla.');
+  } else {
+    lineas.push('');
+    lineas.push('Faltan ' + pendientes.length + ' presupuesto(s) por mover:');
+    pendientes.forEach(function (p) {
+      lineas.push('  ' + p.op + '  ' + p.cliente + '  (uuid ' + p.uuid + ')');
+    });
+    lineas.push('');
+    lineas.push('Ejecuta "moverPestanaSuelta" para pasarlos a la pestaña en uso.');
+  }
+  return volcar_(lineas);
+}
+
+/**
+ * Copia a la pestaña en uso los presupuestos de PESTANA_A_RESCATAR_ que no
+ * esten ya alli, identificandolos por UUID.
+ *
+ * No borra nada: la pestaña de origen se queda igual, para poder comprobar
+ * el resultado antes de eliminarla. Es idempotente, asi que ejecutarlo dos
+ * veces no duplica filas.
+ */
+function moverPestanaSuelta() {
+  const lineas = [];
+  const pendientes = calcularPendientes_(lineas);
+
+  if (pendientes === null) return volcar_(lineas);
+
+  if (pendientes.length === 0) {
+    lineas.push('');
+    lineas.push('No habia nada que mover.');
+    return volcar_(lineas);
+  }
+
+  const destino = getSheet_();
+  pendientes.forEach(function (p) {
+    destino.appendRow(p.fila);
+  });
+
+  lineas.push('');
+  lineas.push('Movidos ' + pendientes.length + ' presupuesto(s) a "' + destino.getName() + '".');
+  lineas.push('La pestaña "' + PESTANA_A_RESCATAR_ + '" NO se ha tocado: comprueba el');
+  lineas.push('listado y, si todo esta bien, ya puedes borrarla a mano.');
+  return volcar_(lineas);
+}
+
+/**
+ * Filas de PESTANA_A_RESCATAR_ cuyo UUID no existe en la pestaña en uso.
+ * Devuelve null si la pestaña de origen no existe o esta vacia.
+ */
+function calcularPendientes_(lineas) {
+  const destino = getSheet_();
+  const ss = destino.getParent();
+  const origen = ss.getSheetByName(PESTANA_A_RESCATAR_);
+
+  lineas.push('===== PESTAÑA SUELTA =====');
+  lineas.push('Origen : "' + PESTANA_A_RESCATAR_ + '"');
+  lineas.push('Destino: "' + destino.getName() + '"  (' + Math.max(0, destino.getLastRow() - 1) + ' filas)');
+
+  if (!origen) {
+    lineas.push('');
+    lineas.push('Esa pestaña no existe. Nada que hacer.');
+    return null;
+  }
+
+  const filasOrigen = Math.max(0, origen.getLastRow() - 1);
+  lineas.push('Filas en origen: ' + filasOrigen);
+
+  if (filasOrigen === 0) {
+    lineas.push('');
+    lineas.push('Esta vacia. Puedes borrarla sin perder nada.');
+    return null;
+  }
+
+  const datos = origen.getRange(2, 1, filasOrigen, SHEET_COLUMNS_.length).getValues();
+
+  return datos.filter(function (fila) {
+    const uuid = fila[COL_UUID_ - 1];
+    return uuid && !buscarFilaPorUuid_(uuid);
+  }).map(function (fila) {
+    return {
+      uuid: fila[COL_UUID_ - 1],
+      op: fila[COL_OP_ - 1],
+      cliente: fila[COL_CLIENTE_ - 1],
+      fila: fila
+    };
+  });
 }
 
 /**
