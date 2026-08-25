@@ -55,7 +55,7 @@ const DEBUG = true;
  * versión se generó un documento concreto); no es un dato de cara al
  * cliente ni forma parte del presupuesto.
  */
-const APP_VERSION = '0.5.0-filtros';
+const APP_VERSION = '0.6.0-interfaz';
 
 /**
  * Clave de Script Properties donde OpportunityRepository.gs guarda el
