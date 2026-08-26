@@ -1634,16 +1634,43 @@
           if (normalizarTexto_(o.vendedor).indexOf(vendedorBuscado) === -1) return false;
         }
 
-        // Un presupuesto sin fecha legible (fechaOrden 0) queda fuera en
-        // cuanto se acota por fechas: no se puede afirmar que caiga dentro.
-        if (desde !== null && !(o.fechaOrden > 0 && o.fechaOrden >= desde)) return false;
-        if (hasta !== null && !(o.fechaOrden > 0 && o.fechaOrden <= hasta)) return false;
+        if (desde !== null || hasta !== null) {
+          const cuando = ordenDe_(o);
+          // Un presupuesto sin fecha legible queda fuera en cuanto se acota
+          // por fechas: no se puede afirmar que caiga dentro.
+          if (!cuando) return false;
+          if (desde !== null && cuando < desde) return false;
+          if (hasta !== null && cuando > hasta) return false;
+        }
 
         return true;
       });
 
       renderSearchResults(visibles);
       actualizarEstado_(visibles.length);
+    }
+
+    /**
+     * Fecha del presupuesto en forma comparable.
+     *
+     * El servidor la manda ya calculada en "fechaOrden". Si no viene -por
+     * ejemplo si la web app esta sirviendo una version anterior del
+     * backend-, se interpreta aqui a partir del texto. Sin este respaldo,
+     * acotar por fechas descartaria TODOS los presupuestos sin dar ninguna
+     * pista de por que.
+     */
+    function ordenDe_(o) {
+      if (typeof o.fechaOrden === 'number' && o.fechaOrden > 0) return o.fechaOrden;
+
+      const texto = String(o.fecha || '').trim();
+      if (!texto) return 0;
+
+      // dd/mm/aaaa, que es como se guarda la fecha del presupuesto.
+      const m = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+
+      const t = Date.parse(texto);
+      return isNaN(t) ? 0 : t;
     }
 
     /**
