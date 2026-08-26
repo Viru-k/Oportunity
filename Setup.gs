@@ -33,6 +33,7 @@ function onOpen() {
     .addItem('Ver diagnostico', 'diagnostico')
     .addItem('Revisar pestaña suelta', 'revisarPestanaSuelta')
     .addItem('Revisar vendedores', 'revisarVendedores')
+    .addItem('Corregir articulo en vendedores', 'corregirArticuloEnVendedores')
     .addToUi();
 }
 
@@ -376,6 +377,123 @@ function revisarVendedores() {
   }
 
   return volcar_(lineas);
+}
+
+/**
+ * Corrige los vendedores a los que se les pego el articulo delante, como
+ * "elANXO P." en lugar de "ANXO P.".
+ *
+ * Por que ahora si se puede hacer por codigo y antes no: la regla exige
+ * DOS condiciones a la vez, y juntas no dejan margen de error.
+ *
+ *   1. El nombre empieza por "el" en minuscula seguido de mayuscula. Los
+ *      nombres reales vienen enteros en mayusculas, asi que un "ELENA S."
+ *      no encaja: su "EL" va en mayuscula.
+ *   2. Lo que queda al quitar ese "el" existe ya como vendedor en los
+ *      datos. "elANXO P." pasa porque "ANXO P." esta en 23 presupuestos;
+ *      un hipotetico "elENA S." no pasaria salvo que hubiera un vendedor
+ *      llamado "ENA S.", que no lo hay.
+ *
+ * Lo que no cumpla las dos se deja intacto y se informa, para decidirlo a
+ * mano. Ejecutalo desde el editor.
+ *
+ * @param {boolean} aplicar false o vacio para solo informar; true para
+ *        escribir los cambios.
+ */
+function corregirArticuloEnVendedores(aplicar) {
+  const lineas = [];
+  const sheet = getSheet_();
+  const ultima = sheet.getLastRow();
+
+  lineas.push('===== ARTICULO PEGADO AL VENDEDOR =====');
+  lineas.push(aplicar === true ? 'Modo: APLICAR cambios' : 'Modo: solo informar');
+  lineas.push('');
+
+  if (ultima < 2) {
+    lineas.push('No hay presupuestos guardados.');
+    return volcar_(lineas);
+  }
+
+  const filas = sheet.getRange(2, 1, ultima - 1, SHEET_COLUMNS_.length).getValues();
+
+  // Primera pasada: que nombres existen de verdad.
+  const conocidos = {};
+  const parseados = filas.map(function (fila) {
+    try {
+      const j = JSON.parse(fila[COL_JSON_ - 1]);
+      const v = String(j['Vendedor'] || '').trim();
+      if (v) conocidos[v] = true;
+      return { json: j, vendedor: v };
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Segunda pasada: candidatos que cumplen las dos condiciones.
+  const cambios = [];
+  const dudosos = [];
+
+  parseados.forEach(function (p, i) {
+    if (!p || !p.vendedor) return;
+    if (!/^el[A-ZÁÉÍÓÚÑÜ]/.test(p.vendedor)) return;
+
+    const limpio = p.vendedor.slice(2).trim();
+    const destino = { fila: i + 2, op: String(filas[i][COL_OP_ - 1]), de: p.vendedor, a: limpio, p: p };
+
+    if (conocidos[limpio]) {
+      cambios.push(destino);
+    } else {
+      dudosos.push(destino);
+    }
+  });
+
+  if (!cambios.length && !dudosos.length) {
+    lineas.push('No hay ningun vendedor con el articulo pegado. Nada que hacer.');
+    return volcar_(lineas);
+  }
+
+  if (cambios.length) {
+    lineas.push('--- Se corrigen (' + cambios.length + ') ---');
+    cambios.forEach(function (c) {
+      lineas.push('  ' + c.op + ':  "' + c.de + '"  ->  "' + c.a + '"');
+    });
+  }
+
+  if (dudosos.length) {
+    lineas.push('');
+    lineas.push('--- NO se tocan: el nombre limpio no existe en los datos (' + dudosos.length + ') ---');
+    dudosos.forEach(function (d) {
+      lineas.push('  ' + d.op + ':  "' + d.de + '"   (quedaria "' + d.a + '", que no consta)');
+    });
+    lineas.push('  Revisalos a mano desde la pantalla de la aplicacion.');
+  }
+
+  lineas.push('');
+
+  if (aplicar !== true) {
+    lineas.push('Esto ha sido solo un informe: no se ha escrito nada.');
+    lineas.push('Para aplicarlo, ejecuta "aplicarCorreccionDeVendedores".');
+    return volcar_(lineas);
+  }
+
+  cambios.forEach(function (c) {
+    c.p.json['Vendedor'] = c.a;
+    sheet.getRange(c.fila, COL_JSON_).setValue(JSON.stringify(c.p.json));
+  });
+
+  lineas.push('Corregidos ' + cambios.length + ' presupuesto(s).');
+  lineas.push('No se ha tocado la fecha de modificacion, para no alterar el');
+  lineas.push('orden del listado por una correccion de ortografia.');
+  return volcar_(lineas);
+}
+
+/**
+ * Aplica de verdad la correccion anterior. Existe como funcion aparte para
+ * que escribir en los datos sea siempre un acto deliberado y no algo que
+ * pase por ejecutar el informe sin querer.
+ */
+function aplicarCorreccionDeVendedores() {
+  return corregirArticuloEnVendedores(true);
 }
 
 /**
