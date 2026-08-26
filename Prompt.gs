@@ -15,9 +15,12 @@ const PROMPT = {
     'El iva sale de la resta del total - el subtotal. ' +
     'Si un dato no aparece en las imágenes, devuélvelo como null. ' +
     'Si hay lineas tachadas, ignora esa linea. ' +
-    'El vendedor aparece en la cabecera detras de "por el". Ese "el" es un ' +
-    'articulo y NO forma parte del nombre: en "por el ANXO P." el vendedor ' +
-    'es "ANXO P.", nunca "ELANXO P.". ' +
+    'El vendedor aparece en la cabecera de una de estas dos formas: detras ' +
+    'de "por el" o detras de "Ha sido atendido por". Devuelve solo el ' +
+    'nombre. En la primera forma, ese "el" es un articulo y NO forma parte ' +
+    'del nombre: en "por el ANXO P." el vendedor es "ANXO P.", nunca ' +
+    '"ELANXO P.". Si ves cualquiera de las dos lineas, "seller" nunca ' +
+    'puede quedar en null. ' +
     'Si una linea lleva un icono de cara sonriente junto a la cantidad, ' +
     'su precio es promocional: devuelve "isOffer": true en esa linea. ' +
     'En el resto de lineas devuelve "isOffer": false. ' +

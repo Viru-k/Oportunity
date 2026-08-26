@@ -439,7 +439,7 @@
       box-shadow: 0 0 0 3px var(--accent-ring);
     }
 
-    .filtro select { min-width: 158px; }
+    .filtro #filtroVendedor { min-width: 178px; }
 
     #limpiarFiltros {
       padding: 8px 13px;
@@ -813,7 +813,9 @@
         <div id="filtros">
           <div class="filtro">
             <label for="filtroVendedor">Vendedor</label>
-            <select id="filtroVendedor"><option value="">Todos</option></select>
+            <input type="text" id="filtroVendedor" list="listaVendedores"
+                   placeholder="Todos" autocomplete="off">
+            <datalist id="listaVendedores"></datalist>
           </div>
           <div class="filtro">
             <label for="filtroDesde">Desde</label>
@@ -907,6 +909,7 @@
 
     const searchInput = document.getElementById('searchInput');
     const filtroVendedor = document.getElementById('filtroVendedor');
+    const listaVendedores = document.getElementById('listaVendedores');
     const filtroDesde = document.getElementById('filtroDesde');
     const filtroHasta = document.getElementById('filtroHasta');
     const limpiarFiltros = document.getElementById('limpiarFiltros');
@@ -1116,6 +1119,13 @@
     const CAMPO_SUBTOTAL = 'Subtotal';
     const CAMPO_TOTAL = 'Total';
     const CAMPO_IVA = 'IVA';
+
+    // Entrada de la lista para aislar los presupuestos sin vendedor.
+    const SIN_VENDEDOR = '(sin vendedor)';
+
+    // Espejo de la tabla de acentos del servidor (OpportunityRepository.gs).
+    const ACENTOS = 'áàäâãåéèëêíìïîóòöôõúùüûñçÁÀÄÂÃÅÉÈËÊÍÌÏÎÓÒÖÔÕÚÙÜÛÑÇ';
+    const SIN_ACENTOS = 'aaaaaaeeeeiiiiooooouuuuncAAAAAAEEEEIIIIOOOOOUUUUNC';
     const TABLA_LINEAS = 'Líneas del presupuesto';
 
     function aNumero_(v) {
@@ -1602,7 +1612,9 @@
     function aplicarFiltro() {
       const query = searchInput.value.trim().toLowerCase();
       const words = query.split(/\s+/).filter(Boolean);
-      const vendedor = filtroVendedor.value;
+      const vendedor = filtroVendedor.value.trim();
+      const vendedorBuscado = normalizarTexto_(vendedor);
+      const sinVendedor = (vendedor === SIN_VENDEDOR);
       const desde = limiteFecha_(filtroDesde.value, false);
       const hasta = limiteFecha_(filtroHasta.value, true);
 
@@ -1612,7 +1624,15 @@
           if (!words.every(function (w) { return texto.indexOf(w) !== -1; })) return false;
         }
 
-        if (vendedor && String(o.vendedor || '') !== vendedor) return false;
+        if (sinVendedor) {
+          // Los presupuestos a los que no se les extrajo vendedor tambien
+          // hay que poder aislarlos: son los que hay que repasar.
+          if (String(o.vendedor || '').trim()) return false;
+        } else if (vendedorBuscado) {
+          // Coincidencia parcial, no igualdad: asi vale tanto elegir de la
+          // lista como teclear "yago" y que salgan los suyos.
+          if (normalizarTexto_(o.vendedor).indexOf(vendedorBuscado) === -1) return false;
+        }
 
         // Un presupuesto sin fecha legible (fechaOrden 0) queda fuera en
         // cuanto se acota por fechas: no se puede afirmar que caiga dentro.
@@ -1667,27 +1687,64 @@
      * en los presupuestos cargados, en vez de con una lista fija que habria
      * que mantener a mano.
      */
-    function poblarVendedores_() {
-      const vistos = [];
-      oportunidades.forEach(function (o) {
-        const v = String(o.vendedor || '').trim();
-        if (v && vistos.indexOf(v) === -1) vistos.push(v);
-      });
-      vistos.sort(function (a, b) { return a.localeCompare(b, 'es'); });
-
-      const seleccionado = filtroVendedor.value;
-      filtroVendedor.innerHTML = '<option value="">Todos</option>';
-      vistos.forEach(function (v) {
-        const op = document.createElement('option');
-        op.value = v;
-        op.textContent = v;
-        filtroVendedor.appendChild(op);
-      });
-      // Se conserva la seleccion si ese vendedor sigue existiendo.
-      if (vistos.indexOf(seleccionado) !== -1) filtroVendedor.value = seleccionado;
+    /**
+     * Quita acentos y pasa a minusculas, igual que hace el servidor, para
+     * que teclear "MUNOZ" encuentre a MUÑOZ.
+     */
+    function normalizarTexto_(v) {
+      const texto = String(v == null ? '' : v);
+      let salida = '';
+      for (let i = 0; i < texto.length; i++) {
+        const c = texto.charAt(i);
+        const pos = ACENTOS.indexOf(c);
+        salida += (pos === -1) ? c : SIN_ACENTOS.charAt(pos);
+      }
+      return salida.toLowerCase();
     }
 
-    [filtroVendedor, filtroDesde, filtroHasta].forEach(function (control) {
+    /**
+     * Rellena la lista de vendedores con los que aparecen de verdad en los
+     * presupuestos cargados, cada uno con cuantos tiene, en vez de con una
+     * lista fija que habria que mantener a mano.
+     *
+     * Se añade tambien una entrada para los presupuestos sin vendedor: son
+     * los que conviene repasar, y sin ella no habria forma de aislarlos.
+     */
+    function poblarVendedores_() {
+      const cuenta = {};
+      let huerfanos = 0;
+
+      oportunidades.forEach(function (o) {
+        const v = String(o.vendedor || '').trim();
+        if (!v) { huerfanos++; return; }
+        cuenta[v] = (cuenta[v] || 0) + 1;
+      });
+
+      const nombres = Object.keys(cuenta).sort(function (a, b) {
+        return a.localeCompare(b, 'es');
+      });
+
+      listaVendedores.innerHTML = '';
+
+      nombres.forEach(function (v) {
+        const op = document.createElement('option');
+        op.value = v;
+        op.label = v + '  (' + cuenta[v] + ')';
+        listaVendedores.appendChild(op);
+      });
+
+      if (huerfanos) {
+        const op = document.createElement('option');
+        op.value = SIN_VENDEDOR;
+        op.label = 'Sin vendedor  (' + huerfanos + ')';
+        listaVendedores.appendChild(op);
+      }
+    }
+
+    // El vendedor se teclea, asi que filtra en cada pulsacion; las fechas
+    // solo cambian al elegirlas.
+    filtroVendedor.addEventListener('input', aplicarFiltro);
+    [filtroDesde, filtroHasta].forEach(function (control) {
       control.addEventListener('change', aplicarFiltro);
     });
 
