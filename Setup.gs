@@ -32,6 +32,7 @@ function onOpen() {
     .addItem('Configurar esta hoja como base de datos', 'configurarHojaDeOportunidades')
     .addItem('Ver diagnostico', 'diagnostico')
     .addItem('Revisar pestaña suelta', 'revisarPestanaSuelta')
+    .addItem('Revisar vendedores', 'revisarVendedores')
     .addToUi();
 }
 
@@ -289,6 +290,92 @@ function calcularPendientes_(lineas) {
       fila: fila
     };
   });
+}
+
+/**
+ * Cuenta que presupuestos guardados tienen vendedor y cuales no, y con que
+ * nombres. Solo informa: no escribe nada.
+ *
+ * Existe porque el filtro de vendedor de la pantalla se construye con los
+ * nombres que hay en los datos. Si sale todo como "sin vendedor", la
+ * pregunta a responder es si el fallo esta en el filtro o en que el campo
+ * viene vacio de la extraccion, y eso solo se sabe mirando lo guardado.
+ *
+ * Ejecutalo desde el editor y mira el registro.
+ */
+function revisarVendedores() {
+  const lineas = [];
+  const sheet = getSheet_();
+  const ultima = sheet.getLastRow();
+
+  lineas.push('===== VENDEDORES EN LO GUARDADO =====');
+  lineas.push('Pestaña: "' + sheet.getName() + '"');
+
+  if (ultima < 2) {
+    lineas.push('No hay presupuestos guardados.');
+    return volcar_(lineas);
+  }
+
+  const filas = sheet.getRange(2, 1, ultima - 1, SHEET_COLUMNS_.length).getValues();
+  const cuenta = {};
+  const sinVendedor = [];
+  let ilegibles = 0;
+
+  filas.forEach(function (fila) {
+    let v = '';
+    try {
+      v = String(JSON.parse(fila[COL_JSON_ - 1])['Vendedor'] || '').trim();
+    } catch (e) {
+      ilegibles++;
+      return;
+    }
+    if (v) {
+      cuenta[v] = (cuenta[v] || 0) + 1;
+    } else {
+      sinVendedor.push(String(fila[COL_OP_ - 1]));
+    }
+  });
+
+  const nombres = Object.keys(cuenta).sort(function (a, b) { return cuenta[b] - cuenta[a]; });
+  const conVendedor = nombres.reduce(function (t, n) { return t + cuenta[n]; }, 0);
+
+  lineas.push('Presupuestos: ' + filas.length);
+  lineas.push('  con vendedor : ' + conVendedor);
+  lineas.push('  sin vendedor : ' + sinVendedor.length);
+  if (ilegibles) lineas.push('  ilegibles    : ' + ilegibles);
+  lineas.push('');
+
+  if (nombres.length) {
+    lineas.push('--- Nombres encontrados ---');
+    nombres.forEach(function (n) {
+      lineas.push('  ' + n + '  (' + cuenta[n] + ')');
+    });
+  } else {
+    lineas.push('--- No hay ni un solo vendedor guardado ---');
+  }
+
+  if (sinVendedor.length) {
+    lineas.push('');
+    lineas.push('--- Sin vendedor (primeros 15) ---');
+    lineas.push('  ' + sinVendedor.slice(0, 15).join(', '));
+  }
+
+  lineas.push('');
+  if (!nombres.length) {
+    lineas.push('CONCLUSION: el campo viene vacio en TODOS. El filtro no tiene');
+    lineas.push('nombres que ofrecer porque no hay ninguno guardado. Hay que');
+    lineas.push('rellenarlos: los nuevos ya los extrae el prompt, y los ' + filas.length);
+    lineas.push('anteriores necesitan una pasada de relleno.');
+  } else if (sinVendedor.length) {
+    lineas.push('CONCLUSION: hay ' + nombres.length + ' nombre(s) guardados, asi que el filtro');
+    lineas.push('SI los muestra. Los ' + sinVendedor.length + ' sin vendedor son presupuestos');
+    lineas.push('anteriores al cambio del prompt.');
+  } else {
+    lineas.push('CONCLUSION: todos tienen vendedor. Si aun asi el filtro los muestra');
+    lineas.push('como "sin vendedor", el despliegue de la web app es antiguo.');
+  }
+
+  return volcar_(lineas);
 }
 
 /**
